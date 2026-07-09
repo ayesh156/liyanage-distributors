@@ -8,11 +8,11 @@ const fmt = (v) => `Rs.${(v / 1000).toFixed(0)}k`;
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white px-4 py-3 border border-gray-200 !rounded-xl shadow-light-card min-w-[180px]">
-      <p className="text-xs font-semibold text-gray-600 mb-2">{label}</p>
+    <div className="bg-white px-4 py-3 border border-gray-200 !rounded-xl shadow-light-card min-w-[180px] dark:bg-slate-800 dark:border-slate-700">
+      <p className="text-xs font-semibold text-gray-600 mb-2 dark:text-slate-300">{label}</p>
       {payload.map((entry, idx) => (
         <div key={idx} className="flex items-center justify-between gap-6 text-xs mb-1">
-          <span className="text-gray-500">{entry.name}:</span>
+          <span className="text-gray-500 dark:text-slate-400">{entry.name}:</span>
           <span className="font-semibold" style={{ color: entry.color }}>
             Rs. {entry.value?.toLocaleString()}
           </span>
@@ -26,8 +26,8 @@ export default function MonthlyTrendChart({ data }) {
   return (
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-800">Monthly Outstanding Trend</h3>
-        <div className="flex items-center gap-3 text-[10px] text-gray-500">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Monthly Outstanding Trend</h3>
+        <div className="flex items-center gap-3 text-[10px] text-gray-500 dark:text-slate-400">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-accent-500 inline-block" /> Invoiced</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Recovered</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Outstanding</span>
@@ -47,8 +47,8 @@ export default function MonthlyTrendChart({ data }) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmt} />
+            <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmt} />
             <Tooltip content={<CustomTooltip />} />
             <Bar
               dataKey="invoiced"

@@ -31,9 +31,9 @@ export default function DashboardStats({ grandTotal, recovered, debtors, payment
   ];
 
   const colorMap = {
-    accent:  { bg: 'from-accent-50 to-accent-100/50',  border: 'border-accent-200',  text: 'text-accent-600',  iconBg: 'bg-accent-100'  },
-    emerald: { bg: 'from-emerald-50 to-emerald-100/50', border: 'border-emerald-200', text: 'text-emerald-600', iconBg: 'bg-emerald-100' },
-    blue:    { bg: 'from-blue-50 to-blue-100/50',       border: 'border-blue-200',    text: 'text-blue-600',    iconBg: 'bg-blue-100'    },
+    accent:  { bg: 'from-accent-50 to-accent-100/50 dark:from-accent-900/20 dark:to-accent-800/10',  border: 'border-accent-200 dark:border-accent-700',  text: 'text-accent-600 dark:text-accent-400',  iconBg: 'bg-accent-100 dark:bg-accent-900/30'  },
+    emerald: { bg: 'from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10', border: 'border-emerald-200 dark:border-emerald-700', text: 'text-emerald-600 dark:text-emerald-400', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    blue:    { bg: 'from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10',       border: 'border-blue-200 dark:border-blue-700',    text: 'text-blue-600 dark:text-blue-400',    iconBg: 'bg-blue-100 dark:bg-blue-900/30'    },
   };
 
   // Payment mode breakdown (cash / cheque / check)
@@ -59,8 +59,8 @@ export default function DashboardStats({ grandTotal, recovered, debtors, payment
                 </div>
               </div>
               <p className={`text-2xl font-bold mb-1 ${c.text}`}>{stat.value}</p>
-              <p className="text-xs font-semibold text-gray-800">{stat.label}</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">{stat.sub}</p>
+              <p className="text-xs font-semibold text-gray-800 dark:text-slate-200">{stat.label}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5 dark:text-slate-400">{stat.sub}</p>
             </div>
           );
         })}
@@ -69,14 +69,14 @@ export default function DashboardStats({ grandTotal, recovered, debtors, payment
       {/* ── Payment Mode Distribution Grid ── */}
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-800">Payment Mode Distribution</h3>
-          <span className="text-xs text-gray-500">
-            Total Collected: <span className="text-gray-900 font-semibold">Rs. {formatCurrency(dist.total)}</span>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Payment Mode Distribution</h3>
+          <span className="text-xs text-gray-500 dark:text-slate-400">
+            Total Collected: <span className="text-gray-900 font-semibold dark:text-slate-100">Rs. {formatCurrency(dist.total)}</span>
           </span>
         </div>
 
         {/* Stacked progress bar */}
-        <div className="flex h-2 rounded-full overflow-hidden mb-4 bg-gray-200">
+        <div className="flex h-2 rounded-full overflow-hidden mb-4 bg-gray-200 dark:bg-slate-700">
           {modes.map(({ key, bg, value }) => {
             const pct = total > 0 ? (value / total) * 100 : 0;
             return pct > 0 ? (
@@ -90,15 +90,15 @@ export default function DashboardStats({ grandTotal, recovered, debtors, payment
           {modes.map(({ key, label, icon: Icon, color, value }) => {
             const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
             return (
-              <div key={key} className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+              <div key={key} className="bg-gray-50 rounded-xl p-3 border border-gray-200 dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center gap-2 mb-2">
                   <Icon size={14} className={color} />
-                  <span className="text-xs font-medium text-gray-600">{label}</span>
+                  <span className="text-xs font-medium text-gray-600 dark:text-slate-400">{label}</span>
                 </div>
                 <p className={`text-base font-bold ${color}`}>
                   Rs. {formatCurrency(Math.round(value))}
                 </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{pct}% of total</p>
+                <p className="text-[10px] text-gray-500 mt-0.5 dark:text-slate-500">{pct}% of total</p>
               </div>
             );
           })}

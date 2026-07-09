@@ -58,17 +58,17 @@ export default function AddShopModal({ isOpen, onClose, onSave, onDelete, routes
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm" onClick={() => { setConfirmDelete(false); onClose(); }} />
-      <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-xl">
+      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm dark:bg-gray-900/40" onClick={() => { setConfirmDelete(false); onClose(); }} />
+      <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-xl dark:bg-slate-800 dark:border-slate-700">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-accent-100 flex items-center justify-center">
               <Store size={16} className="text-accent-600" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-gray-900">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">
                 {isEditing ? 'Edit Hardware Store' : 'Register New Store'}
               </h3>
               {isEditing && (

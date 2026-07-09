@@ -224,7 +224,7 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
   }, [shopGroups, totalMarketOutstanding, getSortedInvoices]);
 
   const SortIcon = ({ field }) => {
-    if (sortField !== field) return <ChevronDown size={12} className="text-gray-400 ml-1 opacity-0 group-hover:opacity-100" />;
+    if (sortField !== field) return <ChevronDown size={12} className="text-gray-400 ml-1 opacity-0 group-hover:opacity-100 dark:text-slate-500" />;
     return (
       <ChevronDown
         size={12}
@@ -295,31 +295,31 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
         <div className="stat-card">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-accent-600" />
+              <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-accent-600 dark:text-accent-400" />
               </div>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent-50 text-accent-700 border border-accent-200">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent-50 text-accent-700 border border-accent-200 dark:bg-accent-900/30 dark:text-accent-300 dark:border-accent-700">
                 Market Total
               </span>
             </div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Total Market Outstanding</p>
-            <p className="text-2xl font-bold text-accent-600">{formatCurrency(Math.round(totalMarketOutstanding))}</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Total Market Outstanding</p>
+            <p className="text-2xl font-bold text-accent-600 dark:text-accent-400">{formatCurrency(Math.round(totalMarketOutstanding))}</p>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <Store className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <Store className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700">
                 Active
               </span>
             </div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Active Debtors</p>
-            <p className="text-2xl font-bold text-gray-900">{summary.shopsWithOutstandingCount}</p>
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Active Debtors</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{summary.shopsWithOutstandingCount}</p>
+            <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">
               out of {activeShopsCount} active stores
             </p>
           </div>
@@ -328,16 +328,16 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
         <div className="stat-card">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
                 Total
               </span>
             </div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Outstanding Invoices</p>
-            <p className="text-2xl font-bold text-gray-900">{summary.totalInvoiceCount}</p>
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Outstanding Invoices</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{summary.totalInvoiceCount}</p>
+            <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">
               totaling {formatCurrency(Math.round(summary.totalInvoiceAmount))}
             </p>
           </div>
@@ -346,16 +346,16 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
         <div className="stat-card">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700">
                 Avg
               </span>
             </div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Avg Outstanding / Debtor</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(Math.round(summary.avgOutstanding))}</p>
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Avg Outstanding / Debtor</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{formatCurrency(Math.round(summary.avgOutstanding))}</p>
+            <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">
               Highest: {formatCurrency(Math.round(summary.highestOutstanding))}
             </p>
           </div>
@@ -366,8 +366,8 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
       <div id="print-content" className="space-y-4">
         {shopGroups.length === 0 ? (
           <div className="glass-card p-12 text-center">
-            <FileText size={48} className="mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-500">No transactions found for the selected criteria</p>
+            <FileText size={48} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
+            <p className="text-gray-500 dark:text-slate-400">No transactions found for the selected criteria</p>
           </div>
         ) : (
           shopGroups
@@ -380,16 +380,16 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
                 <div key={group.shopId} className="glass-card overflow-hidden">
                   {/* Shop Header */}
                   <div 
-                    className="flex items-center justify-between p-4 sm:px-5 sm:py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between p-4 sm:px-5 sm:py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors dark:border-slate-700 dark:hover:bg-slate-700/30"
                     onClick={() => toggleBucket(group.shopId)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-orange-50 flex items-center justify-center text-sm font-bold text-accent-600">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-orange-50 dark:from-accent-900/40 dark:to-orange-900/30 flex items-center justify-center text-sm font-bold text-accent-600 dark:text-accent-400">
                         {group.shopName[0]}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">{group.shopName}</h3>
-                        <div className="flex items-center gap-3 text-[10px] text-gray-500 mt-0.5">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">{group.shopName}</h3>
+                        <div className="flex items-center gap-3 text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">
                           {group.shop?.route && (
                             <span className="flex items-center gap-1">
                               <MapPin size={10} />
@@ -413,12 +413,12 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Outstanding</p>
-                        <p className="text-lg font-bold text-accent-600">{formatCurrency(group.totalOutstanding)}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider">Outstanding</p>
+                        <p className="text-lg font-bold text-accent-600 dark:text-accent-400">{formatCurrency(group.totalOutstanding)}</p>
                       </div>
                       <ChevronDown 
                         size={16} 
-                        className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`text-gray-400 dark:text-slate-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                       />
                     </div>
                   </div>
@@ -428,7 +428,7 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-gray-200 bg-gray-50">
+                          <tr className="table-header-row">
                             <th className="table-header w-8">#</th>
                             <th className="table-header group cursor-pointer select-none w-28" onClick={() => handleSort('date')}>
                               <div className="flex items-center">
@@ -463,10 +463,10 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="table-divide">
                           {sortedInvoices.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="text-center py-8 text-gray-500 text-sm">
+                              <td colSpan={7} className="text-center py-8 text-gray-500 dark:text-slate-400 text-sm">
                                 No invoices found
                               </td>
                             </tr>
@@ -476,27 +476,27 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
                               return (
                                 <tr 
                                   key={`${inv.docNo}-${idx}`}
-                                  className="hover:bg-gray-50 transition-colors"
+                                  className="table-body-row"
                                 >
-                                  <td className="table-cell text-gray-500 text-xs">{idx + 1}</td>
+                                  <td className="table-cell text-gray-500 dark:text-slate-400 text-xs">{idx + 1}</td>
                                   <td className="table-cell">
                                     <div className="flex items-center gap-2">
-                                      <CalendarDays size={13} className="text-gray-400 flex-shrink-0" />
+                                      <CalendarDays size={13} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                                       <span>{formatDate(inv.date)}</span>
                                     </div>
                                   </td>
-                                  <td className="table-cell font-mono text-xs text-gray-500">
+                                  <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">
                                     {inv.docNo}
                                   </td>
-                                  <td className="table-cell text-gray-500 text-xs max-w-[180px] truncate" title={inv.description}>
+                                  <td className="table-cell text-gray-500 dark:text-slate-400 text-xs max-w-[180px] truncate" title={inv.description}>
                                     {inv.description || '—'}
                                   </td>
                                   <td className={`table-cell text-right font-mono text-sm ${
-                                    inv.amount > 0 ? 'text-accent-600' : 'text-emerald-600'
+                                    inv.amount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
                                   }`}>
                                     {formatCurrency(inv.amount)}
                                   </td>
-                                  <td className="table-cell text-right font-mono text-sm font-semibold text-gray-900">
+                                  <td className="table-cell text-right font-mono text-sm font-semibold text-gray-900 dark:text-slate-100">
                                     {formatCurrency(inv.balanceDue)}
                                   </td>
                                   <td className="table-cell text-center">
@@ -522,20 +522,20 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
 
         {/* Total Market Outstanding Footer */}
         {summary.shopsWithOutstandingCount > 0 && (
-          <div className="glass-card border-accent-200 bg-gradient-to-r from-accent-50 to-orange-50 overflow-hidden">
+          <div className="glass-card border-accent-200 dark:border-accent-700 bg-gradient-to-r from-accent-50 to-orange-50 dark:from-accent-900/30 dark:to-accent-800/20 overflow-hidden">
             <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-accent-100 flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-accent-600" />
+                <div className="w-12 h-12 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-accent-600 dark:text-accent-400" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Market Outstanding</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-slate-400">Total Market Outstanding</p>
+                  <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-500">
                     Across {summary.shopsWithOutstandingCount} debtor stores • {summary.totalInvoiceCount} outstanding invoices
                   </p>
                 </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-accent-600">
+              <p className="text-2xl sm:text-3xl font-bold text-accent-600 dark:text-accent-400">
                 {formatCurrency(Math.round(totalMarketOutstanding))}
               </p>
             </div>

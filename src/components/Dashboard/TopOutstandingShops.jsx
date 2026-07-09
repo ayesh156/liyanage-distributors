@@ -33,7 +33,7 @@ export default function TopOutstandingShops({ shops, shopOutstanding }) {
   return (
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-800">Top Outstanding Stores</h3>
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Top Outstanding Stores</h3>
         <TrendingUp size={16} className="text-accent-500" />
       </div>
       <div className="space-y-2">
@@ -46,14 +46,14 @@ export default function TopOutstandingShops({ shops, shopOutstanding }) {
           return (
             <div
               key={shop.id}
-              className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-all duration-200 cursor-default"
+              className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-all duration-200 cursor-default dark:hover:bg-slate-700/50"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-100 to-orange-50 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-accent-600">
                 {shop.name[0]}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-gray-800 truncate">{shop.name}</span>
+                  <span className="text-sm font-medium text-gray-800 truncate dark:text-slate-200">{shop.name}</span>
                   <span className="text-sm font-semibold text-accent-600 whitespace-nowrap font-mono">
                     Rs. {formatCurrency(shop.outstanding)}
                   </span>
@@ -67,7 +67,7 @@ export default function TopOutstandingShops({ shops, shopOutstanding }) {
                     <span className="text-[10px] text-gray-400">{ageDays}d</span>
                   )}
                 </div>
-                <div className="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
+                <div className="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden dark:bg-slate-700">
                   <div
                     className="h-full bg-gradient-to-r from-accent-500 to-accent-400 rounded-full transition-all duration-500"
                     style={{ width: `${barWidth}%` }}

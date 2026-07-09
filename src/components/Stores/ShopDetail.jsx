@@ -43,8 +43,8 @@ export default function ShopDetail({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{shop.name}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">{shop.name}</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
               {shop.route}
               {shop.contact && <span> · {shop.contact}</span>}
             </p>
@@ -63,20 +63,20 @@ export default function ShopDetail({
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="glass-card p-4">
-          <p className="text-xs text-gray-500 mb-1">Total Invoiced</p>
-          <p className="text-lg font-bold text-gray-900">
+          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Invoiced</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
             {formatCurrency(transactions.filter((t) => t.docType === 'Invoice').reduce((s, t) => s + t.amount, 0))}
           </p>
         </div>
         <div className="glass-card p-4">
-          <p className="text-xs text-gray-500 mb-1">Total Collected</p>
-          <p className="text-lg font-bold text-emerald-600">
+          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Collected</p>
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {formatCurrency(transactions.filter((t) => t.docType === 'Payment').reduce((s, t) => s + t.amount, 0))}
           </p>
         </div>
-        <div className="glass-card p-4 bg-gradient-to-br from-accent-50 to-accent-100/50 border-accent-200">
-          <p className="text-xs text-gray-500 mb-1">Outstanding Balance</p>
-          <p className={`text-lg font-bold ${outstanding > 0 ? 'text-accent-600' : 'text-emerald-600'}`}>
+        <div className="glass-card p-4 bg-gradient-to-br from-accent-50 to-accent-100/50 border-accent-200 dark:from-accent-900/20 dark:to-accent-800/10 dark:border-accent-700">
+          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Outstanding Balance</p>
+          <p className={`text-lg font-bold ${outstanding > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
             {outstanding > 0 ? formatCurrency(outstanding) : 'Rs. 0'}
           </p>
         </div>
@@ -84,8 +84,8 @@ export default function ShopDetail({
 
       {/* Transactions */}
       <div className="glass-card overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-800">Transaction History</h3>
+        <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between dark:border-slate-700">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Transaction History</h3>
           <div className="flex items-center gap-2">
             <div className="relative">
               <select
@@ -104,7 +104,7 @@ export default function ShopDetail({
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
+              <tr className="table-header-row">
                 <th className="table-header">Date</th>
                 <th className="table-header">Doc No</th>
                 <th className="table-header">Type</th>
@@ -114,11 +114,11 @@ export default function ShopDetail({
                 <th className="table-header text-center">Del</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="table-divide">
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-500 text-sm">
-                    <Receipt size={28} className="mx-auto mb-2 text-gray-300" />
+                  <td colSpan={7} className="text-center py-12 text-gray-500 dark:text-slate-400 text-sm">
+                    <Receipt size={28} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
                     No transactions yet
                   </td>
                 </tr>
@@ -127,14 +127,14 @@ export default function ShopDetail({
                   const Icon = MODE_ICON[t.paymentMode] || Receipt;
                   const modeColor = MODE_COLOR[t.paymentMode] || 'text-gray-500';
                   return (
-                    <tr key={t.id} className="group hover:bg-gray-50 transition-colors">
+                    <tr key={t.id} className="group table-body-row">
                       <td className="table-cell">
                         <div className="flex items-center gap-2">
-                          <CalendarDays size={12} className="text-gray-400" />
+                          <CalendarDays size={12} className="text-gray-400 dark:text-slate-500" />
                           {formatDate(t.date)}
                         </div>
                       </td>
-                      <td className="table-cell font-mono text-xs text-gray-500">{t.docNo}</td>
+                      <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">{t.docNo}</td>
                       <td className="table-cell">
                         <span className={t.docType === 'Invoice' ? 'badge-amber' : 'badge-green'}>
                           {t.docType === 'Invoice'
@@ -144,20 +144,20 @@ export default function ShopDetail({
                         </span>
                       </td>
                       <td className="table-cell">
-                        <Icon size={13} className={modeColor} title={t.paymentMode} />
+                        <Icon size={13} className={`${modeColor}`} title={t.paymentMode} />
                       </td>
-                      <td className="table-cell font-mono text-xs text-gray-500">
+                      <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">
                         {t.chequeNo || '—'}
                       </td>
                       <td className={`table-cell text-right font-semibold font-mono text-sm ${
-                        t.docType === 'Invoice' ? 'text-accent-600' : 'text-emerald-600'
+                        t.docType === 'Invoice' ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
                       }`}>
                         {t.docType === 'Invoice' ? '+' : '−'} Rs. {t.amount.toLocaleString()}
                       </td>
                       <td className="table-cell text-center">
                         <button
                           onClick={() => onDeleteTransaction(t.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         >
                           <Trash2 size={13} />
                         </button>

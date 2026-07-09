@@ -94,16 +94,24 @@ export default function StoresManager({
   };
 
   // ── Print ──────────────────────────────────────────────────────────────
+  // NOTE: Never call setTheme() or modify theme state here.
+  // All print styling is handled purely by @media print CSS in index.css.
 
   const handlePrintReceipt = (transaction) => {
     setPrintInvoice(transaction);
-    setTimeout(() => window.print(), 100);
+    // Allow React to commit the portal content before the browser print dialog opens
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.print());
+    });
   };
 
   const handlePrintOutstanding = (shopId) => {
     setSelectedShopId(shopId);
     setPrintOutstanding(true);
-    setTimeout(() => window.print(), 100);
+    // Allow React to commit the portal content before the browser print dialog opens
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.print());
+    });
   };
 
   // Print portal content (portaled to body to escape Layout's print:hidden)

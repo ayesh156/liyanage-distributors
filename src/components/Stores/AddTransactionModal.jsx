@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import { X, FileText, Receipt, CalendarDays, DollarSign, CreditCard, Banknote, Building2, Hash, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, FileText, Receipt, CalendarDays, DollarSign, CreditCard, Banknote, Building2, Hash } from 'lucide-react';
+import SmartCombobox from '../ui/SmartCombobox';
+import FancyDatePicker from '../ui/FancyDatePicker';
 import useAppStore from '../../hooks/useAppStore';
 
 const PAYMENT_MODES = [
@@ -9,11 +11,11 @@ const PAYMENT_MODES = [
 ];
 
 const modeColors = {
-  emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  blue:    'bg-blue-100 text-blue-700 border-blue-200',
-  purple:  'bg-purple-100 text-purple-700 border-purple-200',
+  emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700',
+  blue:    'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700',
+  purple:  'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700',
 };
-const modeColorsInactive = 'bg-white text-gray-500 border-gray-200 hover:border-gray-300';
+const modeColorsInactive = 'bg-white text-slate-800 border-slate-200 hover:bg-gray-50 hover:border-slate-300 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:border-slate-600';
 
 function emptyForm() {
   return {
@@ -31,6 +33,7 @@ function emptyForm() {
 }
 
 export default function AddTransactionModal({ isOpen, onClose, onSave, shopName }) {
+  /* ─── ALL REACT HOOKS AT THE ABSOLUTE TOP (Rules of Hooks compliance) ─── */
   const bankNames = useAppStore((s) => s.bankNames);
   const routes    = useAppStore((s) => s.routes);
   const [form, setForm] = useState(emptyForm());
@@ -40,10 +43,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
     if (isOpen) setForm(emptyForm());
   }, [isOpen]);
 
+  const routeOptions = useMemo(() => routes.map((r) => ({ value: r, label: r })), [routes]);
+  const bankOptions  = useMemo(() => bankNames.map((b) => ({ value: b, label: b })), [bankNames]);
+
+  /* ─── EARLY RETURN (AFTER all hooks — order is now stable) ─── */
   if (!isOpen) return null;
 
+  /* ─── DERIVED STATE / HANDLERS ─── */
   const needsChequeFields =
-    form.docType === 'Payment' && (form.paymentMode === 'cheque' || form.paymentMode === 'check');
+    form.docType === 'Payment' &&
+    (form.paymentMode === 'cheque' || form.paymentMode === 'check');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -69,20 +78,21 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm dark:bg-gray-900/40" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[90vh] overflow-visible flex flex-col dark:bg-slate-800 dark:border-slate-700">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10 dark:bg-slate-800 dark:border-slate-700">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Add Transaction</h3>
-            {shopName && <p className="text-xs text-gray-500 mt-0.5">{shopName}</p>}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Add Transaction</h3>
+            {shopName && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{shopName}</p>}
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
             <X size={18} />
           </button>
         </div>
 
+        <div className="overflow-y-auto flex-1 min-h-0">
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Doc Type Toggle */}
           <div>
@@ -92,7 +102,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
                 onClick={() => setForm((f) => ({ ...f, docType: 'Invoice' }))}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                   form.docType === 'Invoice'
-                    ? 'bg-accent-100 text-accent-700 border-accent-200'
+                    ? 'bg-accent-100 text-accent-700 border-accent-200 dark:bg-accent-900/40 dark:text-accent-300 dark:border-accent-700'
                     : modeColorsInactive
                 }`}
               >
@@ -102,7 +112,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
                 onClick={() => setForm((f) => ({ ...f, docType: 'Payment', paymentMode: 'cash' }))}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                   form.docType === 'Payment'
-                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700'
                     : modeColorsInactive
                 }`}
               >
@@ -133,11 +143,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
           {/* Date + Amount */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="input-label">
-                <CalendarDays size={13} className="inline mr-1 text-gray-400" /> Date
-              </label>
-              <input type="date" value={form.date} onChange={set('date')}
-                className="input-field" required />
+              <FancyDatePicker
+                value={form.date}
+                onChange={set('date')}
+                label="Date"
+              />
             </div>
             <div>
               <label className="input-label">
@@ -165,13 +175,14 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
                 <label className="input-label">
                   <Building2 size={13} className="inline mr-1 text-gray-400" /> Bank Branch
                 </label>
-                <div className="relative">
-                  <select value={form.bankName} onChange={set('bankName')} className="input-field appearance-none pr-8">
-                    <option value="">— Select Bank —</option>
-                    {bankNames.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <SmartCombobox
+                  value={form.bankName}
+                  onSelect={(opt) => setForm((f) => ({ ...f, bankName: opt.value }))}
+                  options={bankOptions}
+                  placeholder="Filter by route..."
+                  dropdownMaxHeight="max-h-48"
+                  portal
+                />
               </div>
             </div>
           )}
@@ -195,13 +206,15 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
               </div>
               <div>
                 <label className="input-label">Route</label>
-                <div className="relative">
-                  <select value={form.route} onChange={set('route')} className="input-field appearance-none pr-8">
-                    <option value="">— Select Route —</option>
-                    {routes.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <SmartCombobox
+                  value={form.route}
+                  onSelect={(opt) => setForm((f) => ({ ...f, route: opt.value }))}
+                  options={routeOptions}
+                  placeholder="Filter by route..."
+                  dropdownMaxHeight="max-h-48"
+                  portal
+                  dropdownPosition="top"
+                />
               </div>
             </>
           )}
@@ -222,6 +235,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );
