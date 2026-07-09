@@ -2,10 +2,19 @@ import React from 'react';
 import useAppStore from '../../hooks/useAppStore';
 
 /**
- * PrintFullReport
- * ═══════════════
+ * PrintFullReport — Premium Multi-Shop Outstanding Report
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Shared print layout used by BOTH print paths:
+ * REFACTORED 2026-07-09 — CRITICAL SYNCHRONISATION
+ *   • Header uniformity: matches premium Invoice/Statement Print style
+ *     from OutstandingStatementPrintView exactly — logo on immediate left
+ *     of horizontal banner row, alongside clean corporate headings.
+ *   • One-line shop branding: each hardware store grouped inside the full
+ *     report uses a single horizontal descriptive metadata sequence with
+ *     clean vertical pipe dividers — no layout split boxes or heavy grids.
+ *   • Table constraints: pure itemized ledger grids beneath each shop row.
+ *     NO secondary independent cheque-only receipt tables in this layout.
+ *   • Shared print layout used by BOTH print paths:
  *
  *   1. Full Master Report  (/report page → OutstandingReport.jsx)
  *      <PrintFullReport isFullReport={true} />
@@ -19,25 +28,6 @@ import useAppStore from '../../hooks/useAppStore';
  *      • Uses the injected shop + transaction arrays instead of the store.
  *      • Shows the heading + salutation for the client letter format.
  *      • Same table layout, same totals, same B&W print styles.
- *
- * Refactored 2026-07-09:
- *   • "OUTSTANDING REPORT" bold serif heading (centered) rendered once at page top.
- *   • Liyanage Distributors banner (Logo / Name / Address / Tel) rendered ONCE
- *     per page as the shared topmost section for all hardware entries.
- *   • Individual shop detail restyled as a creative single-line description block
- *     (bold name followed by address/route/tel separated by '|' markers).
- *   • Added "Received (Rs.)" column after "Amount (Rs.)" for full ledger breakdown.
- *   • NON-CUMULATIVE Balance Due: each row shows the individual transaction's
- *     outstanding amount (invoice amount or payment amount), NOT a running balance.
- *   • Footer removed — Liyanage Distributors details only appear in the header at top.
- *   • Single clean "Total Outstanding:" summary row — no extra breakdown labels.
- *   • Grand total computed by summing per-shop net outstanding (not a running balance).
- *
- * CRITICAL REFACTOR (2026-07-09 v2):
- *   • Strict dynamic formula: Balance Due = Amount - Received for every row.
- *   • Filter purge: rows where Balance Due <= 0 are eliminated before render.
- *   • Shop-level total: .reduce() over only the filtered visible rows.
- *   • Final Market Outstanding: grand sum across all shop filtered totals.
  *
  * Props
  * ─────
@@ -53,41 +43,22 @@ const PrintFullReport = ({
   const globalShops        = useAppStore((state) => state.shops)        || [];
   const globalTransactions = useAppStore((state) => state.transactions) || [];
 
-  // ── Fallback static dataset ──
-  const backupShops = [
-    { id: '1', name: 'Metro Electrical House', address: 'Akuressa', phone: '077-3456789', route: 'Akuressa' },
-    { id: '2', name: 'Moon Light Hardware',    address: 'Akuressa', phone: '072-3456789', route: 'Akuressa' },
-  ];
-  const backupTransactions = [
-    { id: 't1', shopId: '1', date: 'May 28, 2026', docNo: 'INV-2026-033', docType: 'Invoice', chequeNo: '-', amount: 45000 },
-    { id: 't2', shopId: '1', date: 'Jun 13, 2026', docNo: 'INV-2026-034', docType: 'Invoice', chequeNo: '-', amount: 35000 },
-    { id: 't3', shopId: '2', date: 'May 10, 2026', docNo: 'INV-2026-018', docType: 'Invoice', chequeNo: '-', amount: 78000 },
-  ];
-
   // ── Data source decision ────────────────────────────────────────────────
   const activeShops = shopOverride
     ? [shopOverride]
-    : (globalShops.length > 0 ? globalShops : backupShops);
+    : globalShops;
 
   const activeTransactions = transactionsOverride
     ? transactionsOverride
-    : (globalTransactions.length > 0 ? globalTransactions : backupTransactions);
+    : globalTransactions;
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year:    'numeric',
-    month:   'long',
-    day:     'numeric',
-  });
-
-  // ── Compute net outstanding per shop (Invoices minus Payments) ──────────
-  // Used only for the shop-level existence filter (is this shop owed anything?)
+  // ── Compute net outstanding per shop (amount minus received) ──────────
   const getNetOutstanding = (shop) => {
     const shopTx = activeTransactions.filter(
       (t) => String(t.shopId) === String(shop.id),
     );
     return shopTx.reduce((sum, t) => {
-      return t.docType === 'Invoice' ? sum + t.amount : sum - t.amount;
+      return sum + Math.max(0, (Number(t.amount) || 0) - (Number(t.received) || 0));
     }, 0);
   };
 
@@ -99,49 +70,35 @@ const PrintFullReport = ({
   // ═══════════════════════════════════════════════════════════════════════
   // PHASE 0: Pre-compute all shop-level report data before rendering
   // ═══════════════════════════════════════════════════════════════════════
-  //
-  // For each shop we compute:
-  //   1. rawRows        — all transactions mapped with dynamic Balance Due
-  //   2. statementRows  — rawRows filtered to exclude fully settled entries
-  //   3. totalOutstanding — .reduce() sum over only the filtered rows
-  //
-  // This ensures the render-loop uses ONLY the filtered, mathematically
-  // accurate data — no stale fallback variables.
-  //
   const shopReportData = reportShops.map((shop) => {
     const shopTx = activeTransactions.filter(
       (t) => String(t.shopId) === String(shop.id),
     );
 
-    // ── Step 1: Map every transaction with strict Balance Due formula ────
-    // Balance Due = Amount - Received
-    //   Invoice → Amount shows, Received = 0, Balance Due = Amount
-    //   Payment → Amount shows, Received = Amount, Balance Due = 0
     const rawRows = shopTx.map((tx) => {
-      const isInvoice = tx.docType === 'Invoice';
-      const displayReceived = isInvoice ? (tx.received || 0) : tx.amount;
-      const displayBalanceDue = Math.max(0, tx.amount - displayReceived);
+      // ── Safely parse all monetary values using the new ledger schema ──
+      const displayAmount     = Number(tx.amount)     || 0;
+      const displayReceived   = Number(tx.received)   || 0;
+      const displayBalanceDue = Math.max(0, displayAmount - displayReceived);
 
-      const ageDays = tx.date
-        ? Math.floor((Date.now() - new Date(tx.date).getTime()) / 86400000)
+      const ageDays = tx.date || tx.postingDate
+        ? Math.floor((Date.now() - new Date(tx.date || tx.postingDate).getTime()) / 86400000)
         : '—';
 
       return {
         ...tx,
-        isInvoice,
-        ageDays,
-        displayAmount: tx.amount,
+        displayAmount,
         displayReceived,
         displayBalanceDue,
+        ageDays,
       };
     });
 
-    // ── Step 2: DYNAMIC PURGE — filter out fully settled rows ───────────
-    // If Balance Due <= 0, the transaction is fully paid and must NOT
-    // appear in the statement.
-    const statementRows = rawRows.filter((row) => row.displayBalanceDue > 0);
+    // ── Only rows where balanceDue > 0 (active outstanding) ────────────
+    const statementRows = rawRows.filter(
+      (row) => Number(row.displayBalanceDue) > 0,
+    );
 
-    // ── Step 3: Shop total = sum of Balance Due of ONLY visible rows ────
     const totalOutstanding = statementRows.reduce(
       (sum, row) => sum + row.displayBalanceDue,
       0,
@@ -150,9 +107,6 @@ const PrintFullReport = ({
     return { shop, statementRows, totalOutstanding };
   });
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // GLOBAL GRAND TOTAL: accumulate all individual shop totals
-  // ═══════════════════════════════════════════════════════════════════════
   const grandTotal = shopReportData.reduce(
     (sum, data) => sum + data.totalOutstanding,
     0,
@@ -261,88 +215,121 @@ const PrintFullReport = ({
       }}>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            PHASE 1: Document Header — rendered ONCE at the top of the report
+            PHASE 1: Document Header — PREMIUM INVOICE/STATEMENT STYLE
             ═══════════════════════════════════════════════════════════════════ */}
 
-        {/* ── 1a. Bold serif "OUTSTANDING REPORT" heading ── */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '14px',
-          paddingBottom: '10px',
-          borderBottom: '2px solid #1a1a2e',
-        }}>
-          <h1 style={{
-            fontFamily: "'Times New Roman', 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif",
-            fontSize: '18pt',
-            fontWeight: 900,
-            margin: 0,
-            letterSpacing: '1px',
-            color: '#1a1a2e',
-            textTransform: 'uppercase',
+        {/* ── 1a. "OUTSTANDING REPORT" bold serif heading ── */}
+        {isFullReport && (
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '14px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #1a1a2e',
           }}>
-            Outstanding Report
-          </h1>
-        </div>
+            <h1 style={{
+              fontFamily: "'Times New Roman', 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif",
+              fontSize: '18pt',
+              fontWeight: 900,
+              margin: 0,
+              letterSpacing: '1px',
+              color: '#1a1a2e',
+              textTransform: 'uppercase',
+            }}>
+              Outstanding Report
+            </h1>
+          </div>
+        )}
 
-        {/* ── 1b. Unified Liyanage Distributors header (once per page) ── */}
+        {/* ── 1b. PREMIUM HEADER BANNER — matches Invoice/Statement Print exactly ── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
+          justifyContent: 'space-between',
           padding: '10px 14px',
           marginBottom: '20px',
           borderBottom: '3px solid #1a1a2e',
-          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          background: '#ffffff',
           borderRadius: '6px',
         }}>
-          <div style={{ flexShrink: 0 }}>
+          {/* LEFT: Logo + Company text in unified row */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            flex: 1,
+            textAlign: 'left',
+          }}>
             <img
               src="/inv_logo.png"
               alt="Liyanage Distributors"
               style={{
-                height: '50px',
+                height: '56px',
                 width: 'auto',
+                objectFit: 'contain',
                 display: 'block',
-                borderRadius: '4px',
               }}
             />
+            <div>
+              <h1 style={{
+                fontSize: '16pt',
+                fontWeight: 900,
+                margin: 0,
+                lineHeight: 1.1,
+                letterSpacing: '0.5px',
+                color: '#1a1a2e',
+              }}>
+                {companyName}
+              </h1>
+              <p style={{
+                fontSize: '8pt',
+                margin: '2px 0 0 0',
+                color: '#333',
+                lineHeight: 1.3,
+              }}>
+                {companyAddress} | Tel: {companyTel}
+              </p>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontSize: '16pt',
-              fontWeight: 900,
-              margin: 0,
-              lineHeight: 1.1,
-              letterSpacing: '0.5px',
-              color: '#1a1a2e',
+
+          {/* RIGHT: REPORT badge (consistent with STATEMENT badge) */}
+          <div style={{
+            flexShrink: 0,
+            textAlign: 'center',
+            padding: '4px 14px',
+            border: '2px solid #1a1a2e',
+            borderRadius: '4px',
+            backgroundColor: '#1a1a2e',
+          }}>
+            <span style={{
+              fontSize: '12pt',
+              fontWeight: 800,
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              color: '#ffffff',
             }}>
-              {companyName}
-            </h1>
-            <p style={{
-              fontSize: '8pt',
-              margin: '2px 0 0 0',
-              color: '#333',
-              lineHeight: 1.3,
-            }}>
-              {companyAddress} | Tel: {companyTel}
-            </p>
+              {isFullReport ? 'REPORT' : 'STATEMENT'}
+            </span>
           </div>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            PHASE 2: Per-shop blocks — shop detail line + transaction table
+            PHASE 2: Per-shop blocks — single-line shop description + table
             ═══════════════════════════════════════════════════════════════════ */}
 
         {shopReportData.map(({ shop, statementRows, totalOutstanding }) => (
           <div key={shop.id} className="store-page-block">
 
-            {/* ── 2a. Creative single-line shop description block ── */}
+            {/* ── 2a. ONE-LINE SHOP BRANDING — single horizontal metadata sequence ── */}
+            {/*     No split boxes, no matrix grids. Clean pipe-delineated line.      */}
             <div style={{
               padding: '6px 0',
               marginBottom: '10px',
               borderBottom: '1px dashed #888',
               width: '100%',
               lineHeight: '1.6',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
               <span style={{
                 fontWeight: 800,
@@ -356,14 +343,14 @@ const PrintFullReport = ({
                 color: '#444',
                 marginLeft: '8px',
               }}>
-                — {shop.address || '—'}
+                — {shop.address || shop.route || '—'}
               </span>
               <span style={{
                 fontSize: '9pt',
                 color: '#555',
                 marginLeft: '6px',
               }}>
-                | {shop.route || shop.address || '—'}
+                | {shop.route || '—'}
               </span>
               <span style={{
                 fontSize: '9pt',
@@ -374,7 +361,7 @@ const PrintFullReport = ({
               </span>
             </div>
 
-            {/* ── 2b. Conditional statement heading + salutation (single-store only) ── */}
+            {/* ── 2b. Single-store heading + salutation ── */}
             {!isFullReport && (
               <div style={{ marginBottom: '12px' }}>
                 <h2 style={{
@@ -386,7 +373,7 @@ const PrintFullReport = ({
                   marginBottom: '6px',
                   color: '#000000',
                 }}>
-                  Outstanding Statement As At: {today}
+                  Outstanding Statement As At: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </h2>
                 <p style={{
                   textAlign: 'justify',
@@ -403,7 +390,8 @@ const PrintFullReport = ({
               </div>
             )}
 
-            {/* ── 2c. Transactions Table with Received (Rs.) column and non-cumulative Balance Due ── */}
+            {/* ── 2c. ITEMIZED LEDGER GRID — pure transactions table ── */}
+            {/*     NO secondary cheque-only receipt tables in this layout. */}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
               <thead>
                 <tr style={{
@@ -416,51 +404,59 @@ const PrintFullReport = ({
                   <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Document No</th>
                   <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Doc Type</th>
                   <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Cheque No</th>
-                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Amount (Rs.)</th>
-                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Received (Rs.)</th>
-                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Balance Due (Rs.)</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Amount</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Received (Credits)</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Balance Due</th>
                   <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Age (Days)</th>
                 </tr>
               </thead>
               <tbody>
-                {statementRows.map((row, idx) => (
-                  <tr key={row.id} style={{
-                    borderBottom: '1px solid #ccc',
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f7f7f7',
-                  }}>
-                    <td style={{ padding: '3px 6px' }}>{row.date}</td>
-                    <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace" }}>{row.docNo}</td>
-                    <td style={{ padding: '3px 6px' }}>{row.docType}</td>
-                    <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace", fontSize: '8pt' }}>
-                      {row.chequeNo || '—'}{row.bankName ? ` / ${row.bankName}` : ''}
+                {statementRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '12px 6px', textAlign: 'center', borderBottom: '1px solid #000000' }}>
+                      No outstanding transactions
                     </td>
-                    <td style={{
-                      textAlign: 'right',
-                      padding: '3px 6px',
-                      fontFamily: "'Courier New', monospace",
-                      fontWeight: row.isInvoice ? 600 : 400,
-                    }}>
-                      {row.displayAmount.toLocaleString()}
-                    </td>
-                    <td style={{
-                      textAlign: 'right',
-                      padding: '3px 6px',
-                      fontFamily: "'Courier New', monospace",
-                      fontWeight: !row.isInvoice || row.displayReceived > 0 ? 600 : 400,
-                    }}>
-                      {row.displayReceived > 0 ? row.displayReceived.toLocaleString() : '—'}
-                    </td>
-                    <td style={{
-                      textAlign: 'right',
-                      padding: '3px 6px',
-                      fontFamily: "'Courier New', monospace",
-                      fontWeight: 700,
-                    }}>
-                      {row.displayBalanceDue.toLocaleString()}
-                    </td>
-                    <td style={{ textAlign: 'right', padding: '3px 6px' }}>{row.ageDays}</td>
                   </tr>
-                ))}
+                ) : (
+                  statementRows.map((row, idx) => (
+                    <tr key={row.id} style={{
+                      borderBottom: '1px solid #ccc',
+                      backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f7f7f7',
+                    }}>
+                      <td style={{ padding: '3px 6px' }}>{row.date || row.postingDate || '—'}</td>
+                      <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace" }}>{row.docNo || row.documentNo || '—'}</td>
+                      <td style={{ padding: '3px 6px' }}>{row.docType || 'Invoice'}</td>
+                      <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace", fontSize: '8pt' }}>
+                        {row.chequeNo || '—'}{row.bankName ? ` / ${row.bankName}` : ''}
+                      </td>
+                      <td style={{
+                        textAlign: 'right',
+                        padding: '3px 6px',
+                        fontFamily: "'Courier New', monospace",
+                        fontWeight: 600,
+                      }}>
+                        {Number(row.displayAmount).toLocaleString()}
+                      </td>
+                      <td style={{
+                        textAlign: 'right',
+                        padding: '3px 6px',
+                        fontFamily: "'Courier New', monospace",
+                        fontWeight: row.displayReceived > 0 ? 600 : 400,
+                      }}>
+                        {row.displayReceived > 0 ? Number(row.displayReceived).toLocaleString() : '—'}
+                      </td>
+                      <td style={{
+                        textAlign: 'right',
+                        padding: '3px 6px',
+                        fontFamily: "'Courier New', monospace",
+                        fontWeight: 700,
+                      }}>
+                        {Number(row.displayBalanceDue).toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px' }}>{row.ageDays}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
               <tfoot>
                 <tr style={{
@@ -491,7 +487,7 @@ const PrintFullReport = ({
                       color: '#ffffff',
                     }}
                   >
-                    {totalOutstanding.toLocaleString()}
+                    {Number(totalOutstanding).toLocaleString()}
                   </td>
                   <td style={{ padding: '8px 6px', color: '#ffffff' }} />
                 </tr>
@@ -501,7 +497,7 @@ const PrintFullReport = ({
           </div>
         ))}
 
-        {/* ── GRAND TOTAL — Final Market Outstanding ─────────────────────── */}
+        {/* ── FINAL MARKET OUTSTANDING — Grand total ─────────────────────── */}
         {isFullReport && (
           <div className="final-summary-block">
             <div style={{
@@ -519,7 +515,7 @@ const PrintFullReport = ({
             }}>
               <span>Final Market Outstanding:</span>
               <span style={{ marginLeft: '16px', fontFamily: "'Courier New', monospace" }}>
-                Rs. {grandTotal.toLocaleString()}
+                Rs. {Number(grandTotal).toLocaleString()}
               </span>
             </div>
           </div>

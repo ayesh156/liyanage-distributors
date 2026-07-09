@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   Search, Printer, Store, CalendarDays, FileText, 
   ChevronDown, TrendingUp, Building2,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import SmartCombobox from '../ui/SmartCombobox';
 import PrintFullReport from './PrintFullReport';
+import Pagination from '../ui/Pagination';
 
 const formatCurrency = (val) => {
   const sign = val < 0 ? '-' : '';
@@ -35,6 +36,18 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
   const [sortField, setSortField] = useState('date');
   const [sortDir, setSortDir] = useState('asc');
   const [expandedBuckets, setExpandedBuckets] = useState({});
+  
+  // ── Per-group pagination state keyed by shopId ──
+  const [currentPages, setCurrentPages] = useState({});
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+
+  // Reset all per-group pages when shop selection or rows-per-page changes
+  useEffect(() => { setCurrentPages({}); }, [selectedShopId, rowsPerPage]);
+
+  // Helper: get/set current page for a specific shop group
+  const getGroupPage = (shopId) => currentPages[shopId] || 1;
+  const setGroupPage = (shopId, page) =>
+    setCurrentPages(prev => ({ ...prev, [shopId]: page }));
 
   // Generate comprehensive report data grouped by shop
   const { shopGroups, totalMarketOutstanding, summary } = useMemo(() => {
@@ -73,24 +86,17 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
       }
     });
 
-    // Calculate per-shop total outstanding via .reduce() summing balanceDue of each invoice
+    // Calculate per-shop total outstanding:
+    // Each invoice's displayBalanceDue = amount - received (non-cumulative, per-row net)
+    // Shop total = sum of per-invoice displayBalanceDue values
     Object.values(groups).forEach(group => {
-      // balanceDue already comes from generateOutstandingReport via per-shop running balance
-      // Use .reduce() to aggregate the dynamically computed balanceDue values
       group.totalOutstanding = group.invoices.reduce((sum, inv) => {
-        // The last invoice's cumulative balanceDue = shop total outstanding
-        // But we use sum of all positive balanceDue for correctness
-        return sum + Math.max(0, inv.balanceDue);
+        const netValue = (Number(inv.amount) || 0) - (Number(inv.received) || 0);
+        return sum + Math.max(0, netValue);
       }, 0);
-
-      // However, since each invoice's balanceDue is cumulative (running total),
-      // the last invoice's balanceDue IS the shop total. We use that.
-      if (group.invoices.length > 0) {
-        group.totalOutstanding = Math.max(0, group.invoices[group.invoices.length - 1].balanceDue);
-      }
     });
 
-    // Grand total via .reduce() aggregating per-shop dynamic totals
+    // Grand total aggregating per-shop totals (non-cumulative sum)
     const totalOutstanding = Object.values(groups).reduce((sum, g) => sum + Math.max(0, g.totalOutstanding || 0), 0);
     
     // Summary stats
@@ -129,6 +135,7 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
       let cmp = 0;
       if (sortField === 'date') cmp = new Date(a.date) - new Date(b.date);
       else if (sortField === 'amount') cmp = a.amount - b.amount;
+      else if (sortField === 'received') cmp = (a.received || 0) - (b.received || 0);
       else if (sortField === 'balanceDue') cmp = a.balanceDue - b.balanceDue;
       else if (sortField === 'ageDays') cmp = a.ageDays - b.ageDays;
       else cmp = a.docNo.localeCompare(b.docNo);
@@ -377,6 +384,13 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
               const sortedInvoices = getSortedInvoices(group.invoices);
               const isExpanded = expandedBuckets[group.shopId] !== false; // default expanded
               
+               // ── Per-group pagination ──
+               const groupPage = getGroupPage(group.shopId);
+               const groupTotalPages = Math.ceil(sortedInvoices.length / rowsPerPage);
+               const indexOfLastRow = groupPage * rowsPerPage;
+               const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+              const paginatedInvoices = sortedInvoices.slice(indexOfFirstRow, indexOfLastRow);
+              
               return (
                 <div key={group.shopId} className="glass-card overflow-hidden">
                   {/* Shop Header */}
@@ -426,95 +440,127 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
 
                   {/* Invoices Table */}
                   {isExpanded && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="table-header-row">
-                            <th className="table-header w-8">#</th>
-                            <th className="table-header group cursor-pointer select-none w-28" onClick={() => handleSort('date')}>
-                              <div className="flex items-center">
-                                Date
-                                <SortIcon field="date" />
-                              </div>
-                            </th>
-                            <th className="table-header group cursor-pointer select-none" onClick={() => handleSort('docNo')}>
-                              <div className="flex items-center">
-                                Document No
-                                <SortIcon field="docNo" />
-                              </div>
-                            </th>
-                            <th className="table-header">Description</th>
-                            <th className="table-header group cursor-pointer select-none text-right w-28" onClick={() => handleSort('amount')}>
-                              <div className="flex items-center justify-end">
-                                Amount
-                                <SortIcon field="amount" />
-                              </div>
-                            </th>
-                            <th className="table-header group cursor-pointer select-none text-right w-28" onClick={() => handleSort('balanceDue')}>
-                              <div className="flex items-center justify-end">
-                                Balance Due
-                                <SortIcon field="balanceDue" />
-                              </div>
-                            </th>
-                            <th className="table-header group cursor-pointer select-none text-center w-20" onClick={() => handleSort('ageDays')}>
-                              <div className="flex items-center justify-center">
-                                Age
-                                <SortIcon field="ageDays" />
-                              </div>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="table-divide">
-                          {sortedInvoices.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="text-center py-8 text-gray-500 dark:text-slate-400 text-sm">
-                                No invoices found
-                              </td>
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="table-header-row">
+                              <th className="table-header w-8">#</th>
+                              <th className="table-header group cursor-pointer select-none w-28" onClick={() => handleSort('date')}>
+                                <div className="flex items-center">
+                                  Date
+                                  <SortIcon field="date" />
+                                </div>
+                              </th>
+                              <th className="table-header group cursor-pointer select-none" onClick={() => handleSort('docNo')}>
+                                <div className="flex items-center">
+                                  Document No
+                                  <SortIcon field="docNo" />
+                                </div>
+                              </th>
+                              <th className="table-header w-24">Doc Type</th>
+                              <th className="table-header">Description</th>
+                              <th className="table-header group cursor-pointer select-none text-right w-28" onClick={() => handleSort('amount')}>
+                                <div className="flex items-center justify-end">
+                                  Amount
+                                  <SortIcon field="amount" />
+                                </div>
+                              </th>
+                              <th className="table-header group cursor-pointer select-none text-right w-28" onClick={() => handleSort('received')}>
+                                <div className="flex items-center justify-end">
+                                  Received
+                                  <SortIcon field="received" />
+                                </div>
+                              </th>
+                              <th className="table-header group cursor-pointer select-none text-right w-28" onClick={() => handleSort('balanceDue')}>
+                                <div className="flex items-center justify-end">
+                                  Balance Due
+                                  <SortIcon field="balanceDue" />
+                                </div>
+                              </th>
+                              <th className="table-header group cursor-pointer select-none text-center w-20" onClick={() => handleSort('ageDays')}>
+                                <div className="flex items-center justify-center">
+                                  Age
+                                  <SortIcon field="ageDays" />
+                                </div>
+                              </th>
                             </tr>
-                          ) : (
-                            sortedInvoices.map((inv, idx) => {
-                              const bucket = getAgeBucket(inv.ageDays);
-                              return (
-                                <tr 
-                                  key={`${inv.docNo}-${idx}`}
-                                  className="table-body-row"
-                                >
-                                  <td className="table-cell text-gray-500 dark:text-slate-400 text-xs">{idx + 1}</td>
-                                  <td className="table-cell">
-                                    <div className="flex items-center gap-2">
-                                      <CalendarDays size={13} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
-                                      <span>{formatDate(inv.date)}</span>
-                                    </div>
-                                  </td>
-                                  <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">
-                                    {inv.docNo}
-                                  </td>
-                                  <td className="table-cell text-gray-500 dark:text-slate-400 text-xs max-w-[180px] truncate" title={inv.description}>
-                                    {inv.description || '—'}
-                                  </td>
-                                  <td className={`table-cell text-right font-mono text-sm ${
-                                    inv.amount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
-                                  }`}>
-                                    {formatCurrency(inv.amount)}
-                                  </td>
-                                  <td className="table-cell text-right font-mono text-sm font-semibold text-gray-900 dark:text-slate-100">
-                                    {formatCurrency(inv.balanceDue)}
-                                  </td>
-                                  <td className="table-cell text-center">
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      <div className={`w-2 h-2 rounded-full ${bucket.barColor}`} />
-                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${bucket.color}`}>
-                                        {inv.ageDays}d
+                          </thead>
+                          <tbody className="table-divide">
+                            {paginatedInvoices.length === 0 ? (
+                              <tr>
+                                <td colSpan={9} className="text-center py-8 text-gray-500 dark:text-slate-400 text-sm">
+                                  No invoices found
+                                </td>
+                              </tr>
+                            ) : (
+                              paginatedInvoices.map((inv, idx) => {
+                                const bucket = getAgeBucket(inv.ageDays);
+                                const displayReceived = Number(inv.received) || 0;
+                                const displayBalanceDue = Math.max(0, (Number(inv.amount) || 0) - displayReceived);
+                                return (
+                                  <tr 
+                                    key={`${inv.docNo}-${idx}`}
+                                    className="table-body-row"
+                                  >
+                                    <td className="table-cell text-gray-500 dark:text-slate-400 text-xs">
+                                      {indexOfFirstRow + idx + 1}
+                                    </td>
+                                    <td className="table-cell">
+                                      <div className="flex items-center gap-2">
+                                        <CalendarDays size={13} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                                        <span>{formatDate(inv.date)}</span>
+                                      </div>
+                                    </td>
+                                    <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">
+                                      {inv.docNo}
+                                    </td>
+                                    <td className="table-cell">
+                                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent-50 text-accent-700 border border-accent-200 dark:bg-accent-900/30 dark:text-accent-300 dark:border-accent-700">
+                                        {inv.docType || 'Invoice'}
                                       </span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                                    </td>
+                                    <td className="table-cell text-gray-500 dark:text-slate-400 text-xs max-w-[180px] truncate" title={inv.description}>
+                                      {inv.description || '—'}
+                                    </td>
+                                    <td className={`table-cell text-right font-mono text-sm ${
+                                      inv.amount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
+                                    }`}>
+                                      {formatCurrency(inv.amount)}
+                                    </td>
+                                    <td className="table-cell text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                                      {displayReceived > 0 ? formatCurrency(displayReceived) : '—'}
+                                    </td>
+                                    <td className="table-cell text-right font-mono text-sm font-semibold text-gray-900 dark:text-slate-100">
+                                      {formatCurrency(displayBalanceDue)}
+                                    </td>
+                                    <td className="table-cell text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <div className={`w-2 h-2 rounded-full ${bucket.barColor}`} />
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${bucket.color}`}>
+                                          {inv.ageDays}d
+                                        </span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Per-group Pagination — only if invoices exceed rowsPerPage */}
+                      {sortedInvoices.length > rowsPerPage && (
+                        <Pagination
+                          currentPage={groupPage}
+                          totalPages={groupTotalPages}
+                          rowsPerPage={rowsPerPage}
+                          onPageChange={(page) => setGroupPage(group.shopId, page)}
+                          onRowsPerPageChange={setRowsPerPage}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
               );

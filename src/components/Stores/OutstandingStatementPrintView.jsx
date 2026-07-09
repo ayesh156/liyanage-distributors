@@ -14,32 +14,68 @@ const formatDateFull = (dateStr) => {
 };
 
 export default function OutstandingStatementPrintView({ shop, transactions, outstanding, currentDate }) {
-  // Build statement rows from transactions with running balance
+  // Build statement rows from transactions with running balance,
+  // expanding each invoice's payments array into individual credit line-items.
   const statementRows = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
 
     const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    let runningBalance = 0;
-    const now = currentDate ? new Date(currentDate) : new Date();
-
-    return sorted.map((t) => {
-      const isInvoice = t.docType === 'Invoice';
+    // First pass: expand every invoice into its debit + credit line items
+    const expandedRows = [];
+    sorted.forEach((t) => {
+      const isInvoice = t.docType !== 'Payment';
       const amount = t.amount;
-      // For Invoice: balance contribution = amount - received
-      // For Payment: reduces running balance
-      runningBalance += isInvoice ? (amount - (t.received || 0)) : -amount;
-      const postingDate = new Date(t.date);
-      const ageDays = Math.floor((now - postingDate) / (1000 * 60 * 60 * 24));
 
-      return {
+      // Debit line: the invoice itself (amount owed)
+      expandedRows.push({
         date: t.date,
         docNo: t.docNo,
         docType: t.docType,
+        lineType: 'Invoice',
         chequeNo: t.chequeNo || '—',
         bankName: t.bankName || '',
         paymentMode: t.paymentMode || '',
-        amount: isInvoice ? amount : -amount,
+        amount: amount,
+        received: 0,
+        balanceDue: 0,
+        ageDays: 0,
+        _contribution: isInvoice ? amount : -amount,
+      });
+
+      // Credit lines: each individual payment received against this invoice
+      if (t.payments && t.payments.length > 0) {
+        t.payments.forEach((p) => {
+          expandedRows.push({
+            date: p.date,
+            docNo: t.docNo,
+            docType: 'Payment',
+            lineType: 'Payment',
+            chequeNo: p.chequeNo || '—',
+            bankName: p.bankName || '',
+            paymentMode: p.paymentMode || '',
+            amount: -p.amount,
+            received: p.amount,
+            balanceDue: 0,
+            ageDays: 0,
+            _contribution: -p.amount,
+          });
+        });
+      }
+    });
+
+    // Second pass: sort expanded rows by date, then compute running balance
+    expandedRows.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let runningBalance = 0;
+    const now = currentDate ? new Date(currentDate) : new Date();
+
+    return expandedRows.map((row) => {
+      runningBalance += row._contribution;
+      const postingDate = new Date(row.date);
+      const ageDays = Math.floor((now - postingDate) / (1000 * 60 * 60 * 24));
+      return {
+        ...row,
         balanceDue: runningBalance,
         ageDays,
       };
@@ -109,58 +145,74 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
         }
       `}</style>
 
-      {/* ===== CREATIVE HEADER ===== */}
-      <div style={{
+      {/* ===== HEADER BANNER ===== */}
+      <div className="erp-header-banner" style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '14px',
-        padding: '12px 14px',
-        marginBottom: '18px',
+        justifyContent: 'space-between',
+        padding: '10px 14px',
+        marginBottom: '14px',
         borderBottom: '3px solid #1a1a2e',
-        background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+        background: '#ffffff',
         borderRadius: '6px',
       }}>
-        {/* Logo */}
-        <div style={{ flexShrink: 0 }}>
+        {/* LEFT: Logo + Company text in a unified flex row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          flex: 1,
+          textAlign: 'left',
+        }}>
           <img
             src="/inv_logo.png"
             alt="Liyanage Distributors"
             style={{
-              height: '58px',
+              height: '56px',
               width: 'auto',
-              display: 'block',
-              borderRadius: '4px',
+              objectFit: 'contain',
             }}
           />
+          <div>
+            <h1 style={{
+              fontSize: '16pt',
+              fontWeight: 900,
+              margin: 0,
+              lineHeight: 1.1,
+              letterSpacing: '0.5px',
+              color: '#1a1a2e',
+            }}>
+              {companyName}
+            </h1>
+            <p style={{
+              fontSize: '8pt',
+              margin: '2px 0 0 0',
+              color: '#333',
+              lineHeight: 1.3,
+            }}>
+              {companyAddress} | Tel: {companyTel}
+            </p>
+          </div>
         </div>
-        {/* Company Info */}
-        <div style={{ flex: 1 }}>
-          <h1 style={{
-            fontSize: '18pt',
-            fontWeight: 900,
-            margin: 0,
-            lineHeight: 1.1,
-            letterSpacing: '0.5px',
-            color: '#1a1a2e',
+
+        {/* RIGHT: STATEMENT badge */}
+        <div style={{
+          flexShrink: 0,
+          textAlign: 'center',
+          padding: '4px 14px',
+          border: '2px solid #1a1a2e',
+          borderRadius: '4px',
+          backgroundColor: '#1a1a2e',
+        }}>
+          <span style={{
+            fontSize: '12pt',
+            fontWeight: 800,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            color: '#ffffff',
           }}>
-            {companyName}
-          </h1>
-          <p style={{
-            fontSize: '8.5pt',
-            margin: '3px 0 0 0',
-            color: '#333',
-            lineHeight: 1.4,
-          }}>
-            {companyAddress}
-          </p>
-          <p style={{
-            fontSize: '8.5pt',
-            margin: '1px 0 0 0',
-            color: '#333',
-            lineHeight: 1.4,
-          }}>
-            Tel: {companyTel}
-          </p>
+            STATEMENT
+          </span>
         </div>
       </div>
 
@@ -191,34 +243,26 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
         </p>
       </div>
 
-      {/* ===== SHOP DETAILS - FULL WIDTH ===== */}
+      {/* ===== SHOP DETAILS - SINGLE-LINE DESCRIPTIVE SEQUENCE ===== */}
       <div style={{
-        padding: '10px 14px',
-        marginBottom: '14px',
-        border: '1px solid #1a1a2e',
-        borderRadius: '4px',
-        backgroundColor: '#fafafa',
+        padding: '6px 0',
+        marginBottom: '12px',
+        borderBottom: '1px dashed #888',
+        width: '100%',
+        lineHeight: '1.6',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9.5pt' }}>
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: 700, paddingRight: '8px', whiteSpace: 'nowrap', verticalAlign: 'top', width: '1%' }}>
-                {shop?.name || '—'}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ paddingRight: '8px', color: '#444', verticalAlign: 'top', fontSize: '9pt' }}>
-                {shop?.address || '—'}
-                {shop?.route ? <span> · Route: {shop.route}</span> : ''}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ paddingRight: '8px', color: '#444', verticalAlign: 'top', fontSize: '9pt' }}>
-                Tel: {shop?.contact || '—'}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <span style={{ fontWeight: 800, fontSize: '11pt', color: '#1a1a2e' }}>
+          {shop?.name || '—'}
+        </span>
+        <span style={{ fontSize: '9pt', color: '#444', marginLeft: '8px' }}>
+          — {shop?.address || '—'}
+        </span>
+        <span style={{ fontSize: '9pt', color: '#555', marginLeft: '6px' }}>
+          | {shop?.route || shop?.address || '—'}
+        </span>
+        <span style={{ fontSize: '9pt', color: '#555', marginLeft: '6px' }}>
+          | Tel: {shop?.contact || '—'}
+        </span>
       </div>
 
       {/* ===== SALUTATION ===== */}
@@ -242,6 +286,7 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
             <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Document Type</th>
             <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Cheque No</th>
             <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Amount</th>
+            <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Received (Credits)</th>
             <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Balance Due</th>
             <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Age (Days)</th>
           </tr>
@@ -249,7 +294,7 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
         <tbody>
           {statementRows.length === 0 ? (
             <tr>
-              <td colSpan={7} style={{ padding: '12px 6px', textAlign: 'center', borderBottom: '1px solid #000000' }}>
+              <td colSpan={8} style={{ padding: '12px 6px', textAlign: 'center', borderBottom: '1px solid #000000' }}>
                 No transactions found
               </td>
             </tr>
@@ -261,26 +306,31 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
               }}>
                 <td style={{ padding: '3px 6px', textAlign: 'left' }}>{formatDate(row.date)}</td>
                 <td style={{ padding: '3px 6px', textAlign: 'left', fontFamily: "'Courier New', monospace" }}>{row.docNo}</td>
-                <td style={{ padding: '3px 6px', textAlign: 'left' }}>{row.docType}</td>
+                <td style={{ padding: '3px 6px', textAlign: 'left' }}>{row.lineType}</td>
                 <td style={{ padding: '3px 6px', textAlign: 'left', fontFamily: "'Courier New', monospace", fontSize: '8pt' }}>
                   {row.chequeNo}{row.bankName ? ` / ${row.bankName}` : ''}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
-                  {row.amount >= 0
-                    ? formatCurrency(row.amount)
-                    : `(${formatCurrency(Math.abs(row.amount))})`}
+                  {row.lineType === 'Payment'
+                    ? `(${formatCurrency(Math.abs(row.amount))})`
+                    : row.amount >= 0
+                      ? formatCurrency(row.amount)
+                      : `(${formatCurrency(Math.abs(row.amount))})`}
+                </td>
+                <td style={{ padding: '3px 6px', textAlign: 'right', fontFamily: "'Courier New', monospace", color: row.lineType === 'Payment' ? '#059669' : '#888' }}>
+                  {row.lineType === 'Payment' ? formatCurrency(row.received) : '—'}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
-                  {formatCurrency(row.balanceDue)}
+                  {formatCurrency(row.balanceDue > 0 ? row.balanceDue : 0)}
                 </td>
-                <td style={{ padding: '3px 6px', textAlign: 'right' }}>{row.ageDays}</td>
+                <td style={{ padding: '3px 6px', textAlign: 'right' }}>{row.ageDays >= 0 ? row.ageDays : '—'}</td>
               </tr>
             ))
           )}
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} style={{
+            <td colSpan={6} style={{
               padding: '8px 6px',
               textAlign: 'right',
               fontWeight: 800,
@@ -303,7 +353,7 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
               backgroundColor: '#1a1a2e',
               color: '#ffffff',
             }}>
-              {formatCurrency(totalOutstanding)}
+              {formatCurrency(totalOutstanding > 0 ? totalOutstanding : 0)}
             </td>
           </tr>
         </tfoot>
@@ -346,22 +396,6 @@ export default function OutstandingStatementPrintView({ shop, transactions, outs
         </div>
       )}
 
-      {/* ===== FOOTER ===== */}
-      <div style={{
-        marginTop: '30px',
-        textAlign: 'center',
-        fontSize: '8pt',
-        color: '#555',
-        borderTop: '1px solid #ccc',
-        paddingTop: '10px',
-      }}>
-        <div style={{ fontWeight: 700, fontSize: '9pt', color: '#1a1a2e' }}>{companyName}</div>
-        <div>{companyAddress}</div>
-        <div>Tel: {companyTel}</div>
-        <div style={{ marginTop: '4px', fontStyle: 'italic', fontSize: '7.5pt', color: '#888' }}>
-          Thank you for your continued business and support.
-        </div>
-      </div>
     </div>
   );
 }

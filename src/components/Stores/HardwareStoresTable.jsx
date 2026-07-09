@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Store, Phone, MapPin, Plus, Edit3, Trash2, ChevronRight, X } from 'lucide-react';
 import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 import SmartCombobox from '../ui/SmartCombobox';
+import Pagination from '../ui/Pagination';
 import useAppStore from '../../hooks/useAppStore';
 
 const formatCurrency = (val) => `Rs. ${(val || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
@@ -29,6 +30,11 @@ export default function HardwareStoresTable({
 }) {
   const routes = useAppStore((s) => s.routes);
   const [routeFilter, setRouteFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+
+  // Reset to page 1 whenever filters or rows-per-page change
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, routeFilter, rowsPerPage]);
 
   const routeOptions = useMemo(() => [
     { value: 'all', label: 'All Routes' },
@@ -39,6 +45,7 @@ export default function HardwareStoresTable({
     })),
   ], [routes, shops]);
 
+  // ── Filtered data (full set, used for aggregate calculations) ──
   const filtered = useMemo(() => {
     let result = shops;
     if (routeFilter !== 'all') result = result.filter((s) => s.route === routeFilter);
@@ -53,6 +60,16 @@ export default function HardwareStoresTable({
     return result;
   }, [shops, routeFilter, searchQuery]);
 
+  // ── Pagination slice — compute displayed rows for the current page ──
+  const paginatedStores = useMemo(() => {
+    const indexOfLastRow = currentPage * rowsPerPage;
+    const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+    return filtered.slice(indexOfFirstRow, indexOfLastRow);
+  }, [filtered, currentPage, rowsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+
+  // ── Global accumulator — computes from FULL filtered dataset, NOT sliced ──
   const totalOutstanding = filtered.reduce((s, shop) => s + Math.max(0, shopOutstanding[shop.id] || 0), 0);
 
   return (
@@ -127,7 +144,7 @@ export default function HardwareStoresTable({
                 </td>
               </tr>
             ) : (
-              filtered.map((shop) => {
+              paginatedStores.map((shop) => {
                 const outstanding = shopOutstanding[shop.id] || 0;
                 const totalPaid   = shop.totalPayments || 0;
                 const routeBadge  = ROUTE_BADGE[shop.route] || 'bg-gray-100 text-gray-500 border-gray-200';
@@ -218,6 +235,17 @@ export default function HardwareStoresTable({
           )}
         </table>
       </div>
+
+      {/* Pagination Footer — conditionally rendered when data exceeds rowsPerPage */}
+      {filtered.length > rowsPerPage && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          rowsPerPage={rowsPerPage}
+          onPageChange={setCurrentPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
+      )}
     </div>
   );
 }

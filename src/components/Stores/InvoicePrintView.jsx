@@ -82,25 +82,27 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
             color: #000000 !important;
           }
           .erp-invoice-sheet table thead th {
-            background: #1a1a2e !important;
-            background-color: #1a1a2e !important;
-            color: #ffffff !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #1a1a2e !important;
+            border-bottom: 2px solid #1a1a2e !important;
           }
           .erp-invoice-sheet table thead th * {
             background: transparent !important;
-            color: #ffffff !important;
+            color: #1a1a2e !important;
           }
           .erp-invoice-sheet .erp-header-banner {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+            background: #ffffff !important;
           }
           .erp-invoice-sheet .summary-strip {
-            background: #1a1a2e !important;
-            background-color: #1a1a2e !important;
-            color: #ffffff !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #1a1a2e !important;
+            border-top: 2px solid #1a1a2e !important;
           }
           .erp-invoice-sheet .summary-strip * {
             background: transparent !important;
-            color: #ffffff !important;
+            color: #1a1a2e !important;
           }
           .erp-invoice-sheet .meta-block {
             background: #ffffff !important;
@@ -139,51 +141,59 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
         }}
       >
         {/* ═════════════════════════════════════════════════════════════════╗
-            HEADER BANNER — Company Logo + Name + Address  (no INVOICE badge)
+            HEADER BANNER — Company Logo + Name + Address  + INVOICE badge
             ╚════════════════════════════════════════════════════════════════╝ */}
         <div className="erp-header-banner" style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
+          justifyContent: 'space-between',
           padding: '10px 14px',
           marginBottom: '16px',
           borderBottom: '3px solid #1a1a2e',
-          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          background: '#ffffff',
           borderRadius: '6px',
         }}>
-          <div style={{ flexShrink: 0 }}>
+          {/* ── LEFT: Logo + Company text in a unified flex row ── */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            flex: 1,
+            textAlign: 'left',
+          }}>
+            {/* Logo — FIRST element, no wrapper div, directly in the flex row */}
             <img
               src="/inv_logo.png"
-              alt="Liyanage Distributors"
+              alt="LHD Logo"
               style={{
-                height: '52px',
+                height: '56px',
                 width: 'auto',
-                display: 'block',
-                borderRadius: '4px',
+                objectFit: 'contain',
               }}
             />
+            <div>
+              <h1 style={{
+                fontSize: '16pt',
+                fontWeight: 900,
+                margin: 0,
+                lineHeight: 1.1,
+                letterSpacing: '0.5px',
+                color: '#1a1a2e',
+              }}>
+                {companyName}
+              </h1>
+              <p style={{
+                fontSize: '8pt',
+                margin: '2px 0 0 0',
+                color: '#333',
+                lineHeight: 1.3,
+              }}>
+                {companyAddress} | Tel: {companyTel}
+              </p>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontSize: '16pt',
-              fontWeight: 900,
-              margin: 0,
-              lineHeight: 1.1,
-              letterSpacing: '0.5px',
-              color: '#1a1a2e',
-            }}>
-              {companyName}
-            </h1>
-            <p style={{
-              fontSize: '8pt',
-              margin: '2px 0 0 0',
-              color: '#333',
-              lineHeight: 1.3,
-            }}>
-              {companyAddress} | Tel: {companyTel}
-            </p>
-          </div>
-          {/* INVOICE badge — clean, no "ORIGINAL" sub-text */}
+
+          {/* ── RIGHT: INVOICE badge — dark box with white text ── */}
           <div style={{
             flexShrink: 0,
             textAlign: 'center',
@@ -214,51 +224,54 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
           gap: '16px',
           marginBottom: '14px',
         }}>
-          {/* ── LEFT COLUMN: Outlet Header Data ── */}
-          <div className="meta-block" style={{
+          {/* ── LEFT COLUMN: Customer / Hardware Shop — Clean Vertical Stack ── */}
+          <div style={{
             flex: '1 1 55%',
-            border: '1px solid #1a1a2e',
-            borderRadius: '4px',
-            padding: '10px 12px',
+            padding: '8px 10px',
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
-              <tbody>
-                <tr>
-                  <td style={{
-                    fontWeight: 800,
-                    fontSize: '11pt',
-                    color: '#1a1a2e',
-                    paddingBottom: '4px',
-                  }} colSpan={2}>
-                    {shop?.name || '—'}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#444', verticalAlign: 'top', paddingRight: '8px', width: '90px' }}>
-                    Address:
-                  </td>
-                  <td style={{ color: '#000', verticalAlign: 'top' }}>
-                    {shop?.address || '—'}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#444', verticalAlign: 'top', paddingRight: '8px' }}>
-                    Phone No:
-                  </td>
-                  <td style={{ color: '#000', verticalAlign: 'top' }}>
-                    {shop?.contact || shop?.phone || '—'}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#444', verticalAlign: 'top', paddingRight: '8px' }}>
-                    Route:
-                  </td>
-                  <td style={{ color: '#000', verticalAlign: 'top' }}>
-                    {routeLabel}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}>
+              {/* Line 1: Shop Name (bold headline) */}
+              <div style={{
+                fontSize: '12pt',
+                fontWeight: 800,
+                color: '#1a1a2e',
+                lineHeight: 1.2,
+              }}>
+                {shop?.name || '—'}
+              </div>
+              {/* Line 2: Address */}
+              <div style={{
+                fontSize: '8.5pt',
+                color: '#444',
+                lineHeight: '1.5',
+              }}>
+                {shop?.address ? `Address: ${shop.address}` : '—'}
+              </div>
+              {/* Line 3: Route */}
+              {routeLabel && (
+                <div style={{
+                  fontSize: '8.5pt',
+                  color: '#444',
+                  lineHeight: '1.5',
+                }}>
+                  Route: {routeLabel}
+                </div>
+              )}
+              {/* Line 4: Phone No */}
+              {(shop?.contact || shop?.phone) && (
+                <div style={{
+                  fontSize: '8.5pt',
+                  color: '#444',
+                  lineHeight: '1.5',
+                }}>
+                  Phone No: {shop?.contact || shop?.phone}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── RIGHT COLUMN: Invoice System Details ── */}
@@ -266,7 +279,7 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
             flex: '1 1 45%',
             border: '1px solid #1a1a2e',
             borderRadius: '4px',
-            padding: '10px 12px',
+            padding: '2px',
           }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
               <tbody>
@@ -351,47 +364,47 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
             <tr style={{
               borderTop: '2px solid #1a1a2e',
               borderBottom: '2px solid #1a1a2e',
-              backgroundColor: '#1a1a2e',
+              backgroundColor: '#ffffff',
             }}>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'center',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
                 width: '30px',
               }}>#</th>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'left',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
               }}>Item Code & Description</th>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'right',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
                 width: '50px',
               }}>QTY</th>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'right',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
                 width: '90px',
               }}>Price</th>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'right',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
                 width: '65px',
               }}>Disc (%)</th>
               <th style={{
                 padding: '5px 6px',
                 textAlign: 'right',
                 fontWeight: 600,
-                color: '#ffffff',
+                color: '#1a1a2e',
                 width: '110px',
               }}>Value (Rs.)</th>
             </tr>
@@ -483,6 +496,7 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
               display: 'flex',
               justifyContent: 'space-between',
               gap: '12px',
+              marginTop: '48px',
             }}>
               {['Customer Signature', 'Invoiced By', 'Authorized By'].map((label) => (
                 <div key={label} style={{ flex: 1 }}>
@@ -490,7 +504,7 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
                     borderTop: '1px solid #333',
                     paddingTop: '4px',
                     marginBottom: '2px',
-                    height: '28px',
+                    height: '10px',
                   }} />
                   <p style={{
                     fontSize: '7.5pt',
@@ -515,18 +529,20 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
             <SummaryRow label="Net Value"    value={formatCurrency(amount)} bordered />
             <SummaryRow label="Final Value"  value={formatCurrency(amount)} bordered />
             <div className="summary-strip" style={{
-              backgroundColor: '#1a1a2e',
+              backgroundColor: '#ffffff',
               padding: '6px 10px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: '12px',
             }}>
               <span style={{
                 fontWeight: 800,
                 fontSize: '9pt',
-                color: '#ffffff',
+                color: '#1a1a2e',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
+                whiteSpace: 'nowrap',
               }}>
                 Final Sale
               </span>
@@ -534,33 +550,14 @@ const InvoicePrintView = forwardRef(({ shop, transaction }, ref) => {
                 fontWeight: 800,
                 fontSize: '10pt',
                 fontFamily: "'Courier New', monospace",
-                color: '#ffffff',
+                color: '#1a1a2e',
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
               }}>
                 {formatCurrency(amount)}
               </span>
             </div>
           </div>
-        </div>
-
-        {/* ═════════════════════════════════════════════════════════════════╗
-            FOOTER
-            ╚════════════════════════════════════════════════════════════════╝ */}
-        <div style={{
-          borderTop: '2px solid #1a1a2e',
-          paddingTop: '8px',
-          textAlign: 'center',
-          fontSize: '7.5pt',
-          color: '#555',
-        }}>
-          <p style={{ fontWeight: 700, fontSize: '8.5pt', margin: '0 0 2px 0', color: '#1a1a2e' }}>
-            Liyanage Distributors
-          </p>
-          <p style={{ margin: '1px 0', color: '#666' }}>
-            {companyAddress} | Tel: {companyTel}
-          </p>
-          <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', fontSize: '7pt', color: '#999' }}>
-            Thank you for your business!
-          </p>
         </div>
 
       </div>

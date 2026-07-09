@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   ArrowLeft, Plus, Trash2, FileText, Receipt,
-  CalendarDays, ChevronDown, Edit3, Banknote, CreditCard, Building2,
+  CalendarDays, ChevronDown, Edit3, Printer, DollarSign,
 } from 'lucide-react';
 
 const formatCurrency = (val) => {
@@ -14,9 +14,6 @@ const formatDate = (dateStr) => {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-const MODE_ICON = { cash: Banknote, cheque: CreditCard, check: Building2, credit: FileText };
-const MODE_COLOR = { cash: 'text-emerald-600', cheque: 'text-blue-600', check: 'text-purple-600', credit: 'text-gray-500' };
-
 export default function ShopDetail({
   shop,
   transactions,
@@ -25,6 +22,8 @@ export default function ShopDetail({
   onAddTransaction,
   onDeleteTransaction,
   onEditShop,
+  onPrintReceipt,
+  onUpdateInvoice,
 }) {
   const [sortOrder, setSortOrder] = useState('newest');
 
@@ -55,32 +54,32 @@ export default function ShopDetail({
             <Edit3 size={13} /> Edit
           </button>
           <button onClick={onAddTransaction} className="btn-primary text-xs">
-            <Plus size={14} /> Add Entry
+            <Plus size={14} /> Add Invoice
           </button>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="glass-card p-4">
-          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Invoiced</p>
-          <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
-            {formatCurrency(transactions.filter((t) => t.docType === 'Invoice').reduce((s, t) => s + t.amount, 0))}
-          </p>
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="glass-card p-4">
+            <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Invoiced</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
+              {formatCurrency(transactions.reduce((s, t) => s + t.amount, 0))}
+            </p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Collected</p>
+            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+              {formatCurrency(transactions.reduce((s, t) => s + (t.received || 0), 0))}
+            </p>
+          </div>
+          <div className="glass-card p-4 bg-gradient-to-br from-accent-50 to-accent-100/50 border-accent-200 dark:from-accent-900/20 dark:to-accent-800/10 dark:border-accent-700">
+            <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Outstanding Balance</p>
+            <p className={`text-lg font-bold ${outstanding > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {outstanding > 0 ? formatCurrency(outstanding) : 'Rs. 0'}
+            </p>
+          </div>
         </div>
-        <div className="glass-card p-4">
-          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Total Collected</p>
-          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(transactions.filter((t) => t.docType === 'Payment').reduce((s, t) => s + t.amount, 0))}
-          </p>
-        </div>
-        <div className="glass-card p-4 bg-gradient-to-br from-accent-50 to-accent-100/50 border-accent-200 dark:from-accent-900/20 dark:to-accent-800/10 dark:border-accent-700">
-          <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Outstanding Balance</p>
-          <p className={`text-lg font-bold ${outstanding > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-            {outstanding > 0 ? formatCurrency(outstanding) : 'Rs. 0'}
-          </p>
-        </div>
-      </div>
 
       {/* Transactions */}
       <div className="glass-card overflow-hidden">
@@ -107,25 +106,28 @@ export default function ShopDetail({
               <tr className="table-header-row">
                 <th className="table-header">Date</th>
                 <th className="table-header">Doc No</th>
-                <th className="table-header">Type</th>
-                <th className="table-header">Mode</th>
-                <th className="table-header">Cheque No</th>
+                <th className="table-header">Doc Type</th>
+                <th className="table-header">Cheque / Bank</th>
                 <th className="table-header text-right">Amount</th>
-                <th className="table-header text-center">Del</th>
+                <th className="table-header text-right">Received</th>
+                <th className="table-header text-right">Balance Due</th>
+                <th className="table-header text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="table-divide">
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-500 dark:text-slate-400 text-sm">
+                  <td colSpan={8} className="text-center py-12 text-gray-500 dark:text-slate-400 text-sm">
                     <Receipt size={28} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
                     No transactions yet
                   </td>
                 </tr>
               ) : (
                 sorted.map((t) => {
-                  const Icon = MODE_ICON[t.paymentMode] || Receipt;
-                  const modeColor = MODE_COLOR[t.paymentMode] || 'text-gray-500';
+                  const chequeDisplay = t.chequeNo
+                    ? <span className="font-mono">{t.chequeNo}{t.bankName ? <span className="ml-1 text-gray-400 dark:text-slate-500">/ {t.bankName}</span> : null}</span>
+                    : '—';
+                  const balanceDue = Math.max(0, (t.amount || 0) - (t.received || 0));
                   return (
                     <tr key={t.id} className="group table-body-row">
                       <td className="table-cell">
@@ -136,31 +138,60 @@ export default function ShopDetail({
                       </td>
                       <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">{t.docNo}</td>
                       <td className="table-cell">
-                        <span className={t.docType === 'Invoice' ? 'badge-amber' : 'badge-green'}>
-                          {t.docType === 'Invoice'
-                            ? <FileText size={10} className="inline mr-1" />
-                            : <Receipt size={10} className="inline mr-1" />}
-                          {t.docType}
+                        <span className="text-sm text-gray-600 dark:text-slate-300">Invoice</span>
+                      </td>
+                      <td className="table-cell text-xs text-gray-500 dark:text-slate-400">{chequeDisplay}</td>
+                      <td className="table-cell text-right font-semibold font-mono text-sm text-accent-600 dark:text-accent-400">
+                        Rs. {t.amount.toLocaleString()}
+                      </td>
+                      <td className="table-cell text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                        {t.received ? `Rs. ${t.received.toLocaleString()}` : 'Rs. 0'}
+                      </td>
+                      <td className="table-cell text-right font-mono text-sm font-semibold">
+                        <span className={balanceDue > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                          Rs. {balanceDue.toLocaleString()}
                         </span>
                       </td>
-                      <td className="table-cell">
-                        <Icon size={13} className={`${modeColor}`} title={t.paymentMode} />
-                      </td>
-                      <td className="table-cell font-mono text-xs text-gray-500 dark:text-slate-400">
-                        {t.chequeNo || '—'}
-                      </td>
-                      <td className={`table-cell text-right font-semibold font-mono text-sm ${
-                        t.docType === 'Invoice' ? 'text-accent-600 dark:text-accent-400' : 'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {t.docType === 'Invoice' ? '+' : '−'} Rs. {t.amount.toLocaleString()}
-                      </td>
                       <td className="table-cell text-center">
-                        <button
-                          onClick={() => onDeleteTransaction(t.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Print Invoice */}
+                          {onPrintReceipt && (
+                            <button onClick={() => onPrintReceipt(t)}
+                              className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-all dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                              title="Print Invoice">
+                              <Printer size={13} />
+                            </button>
+                          )}
+
+                          {/* Collect Payment — only if balanceDue > 0 */}
+                          {balanceDue > 0 && (
+                            <button
+                              onClick={() => onPrintReceipt?.(t)}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 text-gray-400 hover:text-amber-600 transition-all dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
+                              title="Collect Payment"
+                            >
+                              <DollarSign size={13} />
+                            </button>
+                          )}
+
+                          {/* Edit */}
+                          <button
+                            onClick={() => onUpdateInvoice?.(t.id, t)}
+                            className="p-1.5 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-all dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400"
+                            title="Edit"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => onDeleteTransaction(t.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                            title="Delete"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

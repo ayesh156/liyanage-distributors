@@ -26,18 +26,22 @@ function StoresView() {
   const updateShop = useAppStore((s) => s.updateShop);
   const deleteShop = useAppStore((s) => s.deleteShop);
   const addTransaction = useAppStore((s) => s.addTransaction);
+  const addInvoice = useAppStore((s) => s.addInvoice);
   const deleteTransaction = useAppStore((s) => s.deleteTransaction);
   const updateTransaction = useAppStore((s) => s.updateTransaction);
   const routes = useAppStore((s) => s.routes);
 
-  // Sync URL param to store
+  // Sync URL param → store on every id change (including hard refresh)
   useEffect(() => {
-    if (id) {
-      setSelectedShopId(parseInt(id, 10));
-    } else {
-      setSelectedShopId(null);
+    const parsedId = id ? parseInt(id, 10) : null;
+    // Only call setSelectedShopId if it actually changed — prevents infinite loops
+    if (parsedId !== selectedShopId) {
+      setSelectedShopId(parsedId);
     }
-  }, [id, setSelectedShopId]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // NOTE: intentionally omit selectedShopId & setSelectedShopId from deps —
+  // we only want this to fire when the URL id segment changes, not when the
+  // store re-emits the same id after it processes the set call.
 
   return (
     <StoresManager
@@ -55,9 +59,12 @@ function StoresView() {
       updateShop={updateShop}
       deleteShop={deleteShop}
       addTransaction={addTransaction}
+      addInvoice={addInvoice}
       deleteTransaction={deleteTransaction}
       updateTransaction={updateTransaction}
       routes={routes}
+      // Pass the raw URL id so StoresManager can initialize viewMode synchronously
+      urlShopId={id ? parseInt(id, 10) : null}
     />
   );
 }
