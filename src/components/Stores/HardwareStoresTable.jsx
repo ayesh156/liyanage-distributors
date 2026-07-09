@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Store, Phone, MapPin, Plus, Edit3, Trash2, ChevronRight, X } from 'lucide-react';
+import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 import SmartCombobox from '../ui/SmartCombobox';
 import useAppStore from '../../hooks/useAppStore';
 
@@ -32,9 +33,9 @@ export default function HardwareStoresTable({
   const routeOptions = useMemo(() => [
     { value: 'all', label: 'All Routes' },
     ...routes.map((r) => ({
-      value: r,
-      label: r,
-      count: shops.filter((s) => s.route === r).length,
+      value: r.name,
+      label: r.name,
+      count: shops.filter((s) => s.route === r.name).length,
     })),
   ], [routes, shops]);
 
@@ -183,6 +184,15 @@ export default function HardwareStoresTable({
                         >
                           <ChevronRight size={14} />
                         </button>
+                        {onDeleteShop && (
+                          <button
+                            onClick={() => onDeleteShop(shop)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 cursor-pointer transition-colors dark:text-slate-500 dark:hover:text-red-400"
+                            title="Delete Store"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

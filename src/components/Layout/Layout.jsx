@@ -5,12 +5,14 @@ import ThemeToggle from './ThemeToggle';
 const routeMeta = {
   '/': { title: 'Dashboard', subtitle: 'Overview of your business outstanding' },
   '/stores': { title: 'Hardware Stores', subtitle: 'Manage your hardware store accounts' },
+  '/routes': { title: 'Route Management', subtitle: 'Configure delivery routes, areas & schedules' },
   '/full-report': { title: 'Outstanding Report', subtitle: 'Detailed outstanding statement' },
 };
 
 function getMeta(pathname) {
   if (pathname === '/') return routeMeta['/'];
   if (pathname.startsWith('/stores')) return routeMeta['/stores'];
+  if (pathname.startsWith('/routes')) return routeMeta['/routes'];
   if (pathname.startsWith('/full-report')) return routeMeta['/full-report'];
   return { title: 'Dashboard', subtitle: 'Overview of your business outstanding' };
 }

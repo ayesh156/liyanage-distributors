@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import {
-  shops as initialShops,
-  transactions as initialTransactions,
+  initialStores,
+  initialInvoices,
   monthlyTrend as initialTrend,
-  routes as initialRoutes,
+  initialRoutes,
+  initialSalesPersons,
   bankNames as initialBankNames,
   getNextId,
   getNextDocNo,
   getNextReceiptNo,
+  getRouteNames,
 } from '../data/mockData';
 
 // ── Pure computation helpers ────────────────────────────────────────────────
@@ -15,14 +17,21 @@ import {
 function computeDerived(shops, transactions, searchQuery = '') {
   const activeShops = shops.filter((s) => s.active);
 
-  // Net outstanding per shop (Invoice adds, Payment subtracts)
+  // Net outstanding per shop (Invoice adds amount, Payment subtracts amount)
   const shopOutstanding = {};
   shops.forEach((s) => { shopOutstanding[s.id] = 0; });
   transactions.forEach((t) => {
-    const amount = t.docType === 'Invoice' ? t.amount : -t.amount;
-    shopOutstanding[t.shopId] = (shopOutstanding[t.shopId] || 0) + amount;
+    if (t.docType === 'Invoice') {
+      // Use the received field: Balance Due = amount - received
+      const received = t.received || 0;
+      shopOutstanding[t.shopId] = (shopOutstanding[t.shopId] || 0) + (t.amount - received);
+    } else {
+      // Payment records reduce outstanding
+      shopOutstanding[t.shopId] = (shopOutstanding[t.shopId] || 0) - t.amount;
+    }
   });
 
+  // Ensure no negative outstanding (clamp to 0)
   const grandTotalOutstanding = Object.values(shopOutstanding).reduce(
     (sum, v) => sum + Math.max(0, v), 0,
   );
@@ -39,7 +48,7 @@ function computeDerived(shops, transactions, searchQuery = '') {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const topOutstandingShops = activeShops
-    .map((s) => ({ ...s, outstanding: shopOutstanding[s.id] || 0 }))
+    .map((s) => ({ ...s, outstanding: Math.max(0, shopOutstanding[s.id] || 0) }))
     .filter((s) => s.outstanding > 0)
     .sort((a, b) => b.outstanding - a.outstanding)
     .slice(0, 8);
@@ -114,22 +123,22 @@ function computeSelected(shops, transactions, shopOutstanding, selectedShopId) {
     : transactions
         .filter((t) => t.shopId === selectedShopId)
         .sort((a, b) => new Date(b.date) - new Date(a.date));
-  const selectedShopOutstanding = shopOutstanding[selectedShopId] || 0;
+  const selectedShopOutstanding = Math.max(0, shopOutstanding[selectedShopId] || 0);
   return { selectedShop, selectedShopTransactions, selectedShopOutstanding };
 }
 
 // ── Zustand Store ───────────────────────────────────────────────────────────
 
 const useAppStore = create((set, get) => {
-  const initialDerived = computeDerived(initialShops, initialTransactions, '');
+  const initialDerived = computeDerived(initialStores, initialInvoices, '');
   const initialSelected = computeSelected(
-    initialShops, initialTransactions, initialDerived.shopOutstanding, null,
+    initialStores, initialInvoices, initialDerived.shopOutstanding, null,
   );
 
   return {
     // Raw state
-    shops: [...initialShops],
-    transactions: [...initialTransactions],
+    shops: [...initialStores],
+    transactions: [...initialInvoices],
     selectedShopId: null,
     searchQuery: '',
 
@@ -137,10 +146,66 @@ const useAppStore = create((set, get) => {
     ...initialDerived,
     ...initialSelected,
 
+    // Sales Persons
+    salesPersons: [...initialSalesPersons],
+
     // Static
     routes: initialRoutes,
+    routeNames: getRouteNames(initialRoutes),
     bankNames: initialBankNames,
     monthlyTrend: initialTrend,
+
+    // ── Route CRUD Actions ─────────────────────────────────────────────────
+
+    addRoute: (routeData) => {
+      set((state) => {
+        const newRoutes = [
+          ...state.routes,
+          { id: getNextId(state.routes), ...routeData },
+        ];
+        return { ...state, routes: newRoutes, routeNames: getRouteNames(newRoutes) };
+      });
+    },
+
+    updateRoute: (id, data) => {
+      set((state) => {
+        const newRoutes = state.routes.map((r) => r.id === id ? { ...r, ...data } : r);
+        return { ...state, routes: newRoutes, routeNames: getRouteNames(newRoutes) };
+      });
+    },
+
+    deleteRoute: (id) => {
+      set((state) => {
+        const newRoutes = state.routes.filter((r) => r.id !== id);
+        return { ...state, routes: newRoutes, routeNames: getRouteNames(newRoutes) };
+      });
+    },
+
+    // ── Sales Person CRUD Actions ────────────────────────────────────────
+
+    addSalesPerson: (personData) => {
+      set((state) => {
+        const newPersons = [
+          ...state.salesPersons,
+          { id: getNextId(state.salesPersons), ...personData },
+        ];
+        return { ...state, salesPersons: newPersons };
+      });
+    },
+
+    updateSalesPerson: (id, data) => {
+      set((state) => {
+        const newPersons = state.salesPersons.map((p) => p.id === id ? { ...p, ...data } : p);
+        return { ...state, salesPersons: newPersons };
+      });
+    },
+
+    deleteSalesPerson: (id) => {
+      set((state) => {
+        const newPersons = state.salesPersons.filter((p) => p.id !== id);
+        return { ...state, salesPersons: newPersons };
+      });
+    },
 
     // ── Actions ────────────────────────────────────────────────────────────
 
@@ -206,9 +271,17 @@ const useAppStore = create((set, get) => {
         const receiptNo = tData.docType === 'Payment'
           ? getNextReceiptNo(state.transactions)
           : null;
+        const newTransaction = {
+          id: getNextId(state.transactions),
+          ...tData,
+          docNo,
+          ...(receiptNo ? { receiptNo } : {}),
+          // Ensure new Invoice records default received to 0
+          ...(tData.docType === 'Invoice' ? { received: tData.received || 0 } : {}),
+        };
         const newTransactions = [
           ...state.transactions,
-          { id: getNextId(state.transactions), ...tData, docNo, ...(receiptNo ? { receiptNo } : {}) },
+          newTransaction,
         ];
         const derived = computeDerived(state.shops, newTransactions, state.searchQuery);
         const selected = computeSelected(state.shops, newTransactions, derived.shopOutstanding, state.selectedShopId);
@@ -234,33 +307,90 @@ const useAppStore = create((set, get) => {
       });
     },
 
+    /**
+     * generateOutstandingReport: produces per-shop rows with correct running balance
+     * computed independently for each shop. When no shopId specified, all shops'
+     * transactions are processed but each shop has its OWN running balance.
+     *
+     * For each Invoice row, balanceDue = amount - received (cumulative per shop).
+     */
     generateOutstandingReport: (shopId = null) => {
       const { shops, transactions } = get();
-      let filtered = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
-      if (shopId) filtered = filtered.filter((t) => t.shopId === shopId);
 
-      let runningBalance = 0;
-      const now = new Date();
-      const rows = filtered.map((t) => {
-        const isInvoice = t.docType === 'Invoice';
-        runningBalance += isInvoice ? t.amount : -t.amount;
-        return {
-          date: t.date,
-          docNo: t.docNo,
-          docType: t.docType,
-          chequeNo: t.chequeNo || '—',
-          bankName: t.bankName || '—',
-          paymentMode: t.paymentMode || '—',
-          amount: isInvoice ? t.amount : -t.amount,
-          balanceDue: runningBalance,
-          ageDays: Math.floor((now - new Date(t.date)) / 86400000),
-          shopId: t.shopId,
-          shopName: shops.find((s) => s.id === t.shopId)?.name || 'Unknown',
-          description: t.description || '',
-        };
+      // Build a map of shop ID to shop name
+      const shopMap = {};
+      shops.forEach((s) => { shopMap[s.id] = s.name; });
+
+      // Filter transactions by shop if needed
+      let filtered = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Group transactions by shopId for per-shop running balance
+      const shopTransactions = {};
+      filtered.forEach((t) => {
+        if (shopId && t.shopId !== shopId) return; // skip if filtering to specific shop
+        if (!shopTransactions[t.shopId]) shopTransactions[t.shopId] = [];
+        shopTransactions[t.shopId].push(t);
       });
 
-      return { rows, totalOutstanding: rows.length > 0 ? rows[rows.length - 1].balanceDue : 0 };
+      // Process each shop's transactions independently with its own running balance
+      const now = new Date();
+      const rows = [];
+
+      // Sort shop IDs for deterministic output
+      const sortedShopIds = Object.keys(shopTransactions)
+        .map(Number)
+        .sort((a, b) => a - b);
+
+      sortedShopIds.forEach((sid) => {
+        let runningBalance = 0;
+        shopTransactions[sid].forEach((t) => {
+          if (t.docType === 'Invoice') {
+            // For Invoice: balanceDue = amount - received (cumulative)
+            const received = t.received || 0;
+            runningBalance += (t.amount - received);
+            rows.push({
+              date: t.date,
+              docNo: t.docNo,
+              docType: t.docType,
+              chequeNo: t.chequeNo || '—',
+              bankName: t.bankName || '—',
+              paymentMode: t.paymentMode || '—',
+              amount: t.amount,
+              received: received,
+              balanceDue: runningBalance,
+              ageDays: Math.floor((now - new Date(t.date)) / 86400000),
+              shopId: t.shopId,
+              shopName: shopMap[sid] || 'Unknown',
+              description: t.description || '',
+            });
+          } else {
+            // Payment: reduces running balance
+            runningBalance -= t.amount;
+            rows.push({
+              date: t.date,
+              docNo: t.docNo,
+              docType: t.docType,
+              chequeNo: t.chequeNo || '—',
+              bankName: t.bankName || '—',
+              paymentMode: t.paymentMode || '—',
+              amount: -t.amount,
+              received: 0,
+              balanceDue: runningBalance,
+              ageDays: Math.floor((now - new Date(t.date)) / 86400000),
+              shopId: t.shopId,
+              shopName: shopMap[sid] || 'Unknown',
+              description: t.description || '',
+            });
+          }
+        });
+      });
+
+      // Total outstanding = sum of all positive per-shop running balances
+      const totalOutstanding = rows
+        .filter((r) => r.docType === 'Invoice')
+        .reduce((sum, r) => sum + Math.max(0, r.balanceDue), 0);
+
+      return { rows, totalOutstanding };
     },
   };
 });

@@ -4,6 +4,8 @@ import Layout from './components/Layout/Layout';
 import Dashboard from './components/Dashboard/Dashboard';
 import StoresManager from './components/Stores/StoresManager';
 import OutstandingReport from './components/Report/OutstandingReport';
+import RouteManager from './components/Routes/RouteManager';
+import SalesPersonManager from './components/SalesPersons/SalesPersonManager';
 import useAppStore from './hooks/useAppStore';
 
 // ---- Individual primitive selectors (guarantee stable getSnapshot) ----
@@ -100,6 +102,14 @@ function DashboardView() {
   );
 }
 
+function RoutesView() {
+  return <RouteManager />;
+}
+
+function SalesPersonsView() {
+  return <SalesPersonManager />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -107,6 +117,8 @@ export default function App() {
         <Route index element={<DashboardView />} />
         <Route path="stores" element={<StoresView />} />
         <Route path="stores/:id" element={<StoresView />} />
+        <Route path="sales-persons" element={<SalesPersonsView />} />
+        <Route path="routes" element={<RoutesView />} />
         <Route path="full-report" element={<ReportView />} />
       </Route>
     </Routes>

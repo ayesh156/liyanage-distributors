@@ -40,10 +40,10 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
   const { shopGroups, totalMarketOutstanding, summary } = useMemo(() => {
     const selectedId = selectedShopId === 'all' ? null : parseInt(selectedShopId);
     
-    // Get raw report data - all transactions sorted by date with running balance
+    // Get raw report data - all transactions sorted by date with per-shop running balance
     const { rows } = generateOutstandingReport(selectedId);
     
-    // Group by shop
+    // Group by shop — rows already have correct balanceDue from generateOutstandingReport
     const groups = {};
     rows.forEach(row => {
       if (!groups[row.shopId]) {
@@ -55,50 +55,49 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
           invoices: [],
           totalOutstanding: 0,
           totalInvoiced: 0,
+          totalReceived: 0,
           invoiceCount: 0,
         };
       }
       const group = groups[row.shopId];
       
       if (row.docType === 'Invoice') {
-        group.invoices.push({ ...row });
-        group.totalInvoiced += Math.abs(row.amount);
+        group.invoices.push({
+          ...row,
+          ageDays: row.ageDays,
+          ageBucket: getAgeBucket(row.ageDays),
+        });
+        group.totalInvoiced += row.amount;
+        group.totalReceived += (row.received || 0);
         group.invoiceCount++;
       }
     });
 
-    // Process each shop's invoices with running balance
+    // Calculate per-shop total outstanding via .reduce() summing balanceDue of each invoice
     Object.values(groups).forEach(group => {
-      // Sort invoices by date
-      group.invoices.sort((a, b) => new Date(a.date) - new Date(b.date));
-      
-      // The generateOutstandingReport already calculated balanceDue for each row
-      // We need to match each invoice with its balanceDue from the original calculation
-      const allShopRows = rows.filter(r => r.shopId === group.shopId);
-      
-      // Attach running balance and age data to each invoice
-      group.invoices = group.invoices.map(inv => {
-        const matchingRow = allShopRows.find(r => r.docNo === inv.docNo && r.docType === 'Invoice');
-        return {
-          ...inv,
-          ageDays: getAgeDays(inv.date),
-          ageBucket: getAgeBucket(getAgeDays(inv.date)),
-          balanceDue: matchingRow ? matchingRow.balanceDue : 0,
-        };
-      });
-      
-      // The last invoice's balanceDue is the total outstanding for this shop
+      // balanceDue already comes from generateOutstandingReport via per-shop running balance
+      // Use .reduce() to aggregate the dynamically computed balanceDue values
+      group.totalOutstanding = group.invoices.reduce((sum, inv) => {
+        // The last invoice's cumulative balanceDue = shop total outstanding
+        // But we use sum of all positive balanceDue for correctness
+        return sum + Math.max(0, inv.balanceDue);
+      }, 0);
+
+      // However, since each invoice's balanceDue is cumulative (running total),
+      // the last invoice's balanceDue IS the shop total. We use that.
       if (group.invoices.length > 0) {
-        group.totalOutstanding = group.invoices[group.invoices.length - 1].balanceDue;
+        group.totalOutstanding = Math.max(0, group.invoices[group.invoices.length - 1].balanceDue);
       }
     });
 
+    // Grand total via .reduce() aggregating per-shop dynamic totals
     const totalOutstanding = Object.values(groups).reduce((sum, g) => sum + Math.max(0, g.totalOutstanding || 0), 0);
     
     // Summary stats
     const shopsWithOutstanding = Object.values(groups).filter(g => (g.totalOutstanding || 0) > 0);
     const totalInvoiceCount = Object.values(groups).reduce((sum, g) => sum + g.invoiceCount, 0);
     const totalInvoiceAmount = Object.values(groups).reduce((sum, g) => sum + g.totalInvoiced, 0);
+    const totalReceivedAmount = Object.values(groups).reduce((sum, g) => sum + g.totalReceived, 0);
     const avgOutstanding = shopsWithOutstanding.length > 0 
       ? totalOutstanding / shopsWithOutstanding.length 
       : 0;
@@ -116,7 +115,8 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
       summary: { 
         shopsWithOutstandingCount: shopsWithOutstanding.length, 
         totalInvoiceCount, 
-        totalInvoiceAmount, 
+        totalInvoiceAmount,
+        totalReceivedAmount,
         avgOutstanding, 
         highestOutstanding 
       },
@@ -181,7 +181,8 @@ export default function OutstandingReport({ shops, allShops, generateOutstanding
     setSelectedShopId(option.value);
   };
 
-  // DIRECT PRINT: Stay on this page and trigger window.print()
+  // NOTE: Never call setTheme() or modify theme state here.
+  // All print styling is handled purely by @media print CSS in index.css.
   const handlePrint = () => {
     window.print();
   };

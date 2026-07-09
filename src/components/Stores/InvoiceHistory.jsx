@@ -5,6 +5,7 @@ import {
   CreditCard, Building2, ChevronDown,
 } from 'lucide-react';
 import useAppStore from '../../hooks/useAppStore';
+import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 
 const formatCurrency = (val) => `Rs. ${(val || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 const formatDate = (dateStr) => {
@@ -47,7 +48,9 @@ export default function InvoiceHistory({
   const [searchQuery,  setSearchQuery]  = useState('');
   const [sortOrder,    setSortOrder]    = useState('newest');
   const [typeFilter,   setTypeFilter]   = useState('all'); // 'all' | 'Invoice' | 'Payment'
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Delete confirm state
+  const [deleteTarget, setDeleteTarget] = useState(null); // transaction object
 
   const filtered = transactions
     .filter((t) => {
@@ -85,9 +88,14 @@ export default function InvoiceHistory({
     }
   };
 
-  const handleDelete = (id) => {
-    if (confirmDeleteId === id) { onDeleteTransaction(id); setConfirmDeleteId(null); }
-    else setConfirmDeleteId(id);
+  const handleDeleteRequest = (transaction) => {
+    setDeleteTarget(transaction);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    onDeleteTransaction(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   const em = (field) => (e) => setEditModal((m) => ({ ...m, [field]: e.target.value }));
@@ -214,9 +222,8 @@ export default function InvoiceHistory({
               ) : (
                 filtered.map((t) => {
                   const isInvoice = t.docType === 'Invoice';
-                  const isDeleting = confirmDeleteId === t.id;
                   return (
-                    <tr key={t.id} className={`group table-body-row ${isDeleting ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                    <tr key={t.id} className="group table-body-row">
                       <td className="table-cell">
                         <div className="flex items-center gap-1.5">
                           <CalendarDays size={12} className="text-gray-400 dark:text-slate-500" />
@@ -257,13 +264,11 @@ export default function InvoiceHistory({
                               <Printer size={13} />
                             </button>
                           )}
-                          <button onClick={() => handleDelete(t.id)}
-                            className={`p-1.5 rounded-lg transition-all ${
-                              isDeleting
-                                ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                : 'hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 dark:hover:bg-red-900/20 dark:hover:text-red-400'
-                            }`}
-                            title={isDeleting ? 'Click again to confirm' : 'Delete'}>
+                          <button
+                            onClick={() => handleDeleteRequest(t)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                            title="Delete"
+                          >
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -363,6 +368,20 @@ export default function InvoiceHistory({
           </div>
         </div>
       )}
+
+      {/* ── Delete Confirmation Modal ──────────────────────────── */}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        entityType={deleteTarget?.docType === 'Invoice' ? 'invoice' : 'payment'}
+        entityName={deleteTarget?.docNo || ''}
+        extraMessage={
+          deleteTarget
+            ? `This will permanently remove transaction ${deleteTarget.docNo} from ${shop?.name}'s history.`
+            : null
+        }
+      />
     </div>
   );
 }

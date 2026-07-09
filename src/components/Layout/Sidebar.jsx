@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Store, FileText, Zap, ChevronLeft, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Store, FileText, Zap, ChevronLeft, Menu, X, Map, Users } from 'lucide-react';
 
 const navItems = [
   { id: '/', label: 'Dashboard', icon: LayoutDashboard },
   { id: '/stores', label: 'Hardware Stores', icon: Store },
+  { id: '/sales-persons', label: 'Sales Persons', icon: Users },
+  { id: '/routes', label: 'Route Management', icon: Map },
   { id: '/full-report', label: 'Reports', icon: FileText },
 ];
 

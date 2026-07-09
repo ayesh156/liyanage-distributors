@@ -20,6 +20,25 @@ import useAppStore from '../../hooks/useAppStore';
  *      • Shows the heading + salutation for the client letter format.
  *      • Same table layout, same totals, same B&W print styles.
  *
+ * Refactored 2026-07-09:
+ *   • "OUTSTANDING REPORT" bold serif heading (centered) rendered once at page top.
+ *   • Liyanage Distributors banner (Logo / Name / Address / Tel) rendered ONCE
+ *     per page as the shared topmost section for all hardware entries.
+ *   • Individual shop detail restyled as a creative single-line description block
+ *     (bold name followed by address/route/tel separated by '|' markers).
+ *   • Added "Received (Rs.)" column after "Amount (Rs.)" for full ledger breakdown.
+ *   • NON-CUMULATIVE Balance Due: each row shows the individual transaction's
+ *     outstanding amount (invoice amount or payment amount), NOT a running balance.
+ *   • Footer removed — Liyanage Distributors details only appear in the header at top.
+ *   • Single clean "Total Outstanding:" summary row — no extra breakdown labels.
+ *   • Grand total computed by summing per-shop net outstanding (not a running balance).
+ *
+ * CRITICAL REFACTOR (2026-07-09 v2):
+ *   • Strict dynamic formula: Balance Due = Amount - Received for every row.
+ *   • Filter purge: rows where Balance Due <= 0 are eliminated before render.
+ *   • Shop-level total: .reduce() over only the filtered visible rows.
+ *   • Final Market Outstanding: grand sum across all shop filtered totals.
+ *
  * Props
  * ─────
  * isFullReport          {boolean}   true = master report, false = single store letter
@@ -34,10 +53,10 @@ const PrintFullReport = ({
   const globalShops        = useAppStore((state) => state.shops)        || [];
   const globalTransactions = useAppStore((state) => state.transactions) || [];
 
-  // ── Fallback static dataset (matches real distribution workflow shape) ──
+  // ── Fallback static dataset ──
   const backupShops = [
-    { id: '1', name: 'Metro Electrical House', address: 'Akuressa', phone: '077-3456789' },
-    { id: '2', name: 'Moon Light Hardware',    address: 'Akuressa', phone: '072-3456789' },
+    { id: '1', name: 'Metro Electrical House', address: 'Akuressa', phone: '077-3456789', route: 'Akuressa' },
+    { id: '2', name: 'Moon Light Hardware',    address: 'Akuressa', phone: '072-3456789', route: 'Akuressa' },
   ];
   const backupTransactions = [
     { id: 't1', shopId: '1', date: 'May 28, 2026', docNo: 'INV-2026-033', docType: 'Invoice', chequeNo: '-', amount: 45000 },
@@ -46,8 +65,6 @@ const PrintFullReport = ({
   ];
 
   // ── Data source decision ────────────────────────────────────────────────
-  // Single-store path injects shopOverride + transactionsOverride.
-  // Full-report path reads from global store (falls back to static demo).
   const activeShops = shopOverride
     ? [shopOverride]
     : (globalShops.length > 0 ? globalShops : backupShops);
@@ -64,6 +81,7 @@ const PrintFullReport = ({
   });
 
   // ── Compute net outstanding per shop (Invoices minus Payments) ──────────
+  // Used only for the shop-level existence filter (is this shop owed anything?)
   const getNetOutstanding = (shop) => {
     const shopTx = activeTransactions.filter(
       (t) => String(t.shopId) === String(shop.id),
@@ -74,24 +92,79 @@ const PrintFullReport = ({
   };
 
   // ── Filter: only render stores with a positive net outstanding ──────────
-  // For single-store path we always show the shop regardless (override).
   const reportShops = shopOverride
     ? activeShops
     : activeShops.filter((shop) => getNetOutstanding(shop) > 0);
 
-  // ── Grand total across rendered shops ───────────────────────────────────
-  const grandTotal = reportShops.reduce(
-    (sum, shop) => sum + getNetOutstanding(shop),
+  // ═══════════════════════════════════════════════════════════════════════
+  // PHASE 0: Pre-compute all shop-level report data before rendering
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // For each shop we compute:
+  //   1. rawRows        — all transactions mapped with dynamic Balance Due
+  //   2. statementRows  — rawRows filtered to exclude fully settled entries
+  //   3. totalOutstanding — .reduce() sum over only the filtered rows
+  //
+  // This ensures the render-loop uses ONLY the filtered, mathematically
+  // accurate data — no stale fallback variables.
+  //
+  const shopReportData = reportShops.map((shop) => {
+    const shopTx = activeTransactions.filter(
+      (t) => String(t.shopId) === String(shop.id),
+    );
+
+    // ── Step 1: Map every transaction with strict Balance Due formula ────
+    // Balance Due = Amount - Received
+    //   Invoice → Amount shows, Received = 0, Balance Due = Amount
+    //   Payment → Amount shows, Received = Amount, Balance Due = 0
+    const rawRows = shopTx.map((tx) => {
+      const isInvoice = tx.docType === 'Invoice';
+      const displayReceived = isInvoice ? (tx.received || 0) : tx.amount;
+      const displayBalanceDue = Math.max(0, tx.amount - displayReceived);
+
+      const ageDays = tx.date
+        ? Math.floor((Date.now() - new Date(tx.date).getTime()) / 86400000)
+        : '—';
+
+      return {
+        ...tx,
+        isInvoice,
+        ageDays,
+        displayAmount: tx.amount,
+        displayReceived,
+        displayBalanceDue,
+      };
+    });
+
+    // ── Step 2: DYNAMIC PURGE — filter out fully settled rows ───────────
+    // If Balance Due <= 0, the transaction is fully paid and must NOT
+    // appear in the statement.
+    const statementRows = rawRows.filter((row) => row.displayBalanceDue > 0);
+
+    // ── Step 3: Shop total = sum of Balance Due of ONLY visible rows ────
+    const totalOutstanding = statementRows.reduce(
+      (sum, row) => sum + row.displayBalanceDue,
+      0,
+    );
+
+    return { shop, statementRows, totalOutstanding };
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // GLOBAL GRAND TOTAL: accumulate all individual shop totals
+  // ═══════════════════════════════════════════════════════════════════════
+  const grandTotal = shopReportData.reduce(
+    (sum, data) => sum + data.totalOutstanding,
     0,
   );
+
+  const companyName = 'Liyanage Distributors';
+  const companyAddress = 'Hakmana Road, Deiyandara.';
+  const companyTel = '070-5237647 / 071-5944711';
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        /*
-         * SCREEN: Keep the print canvas in the layout flow so the browser
-         * pre-computes its print layout, but hide it visually.
-         */
         @media screen {
           .mans-lanka-master-print {
             visibility: hidden !important;
@@ -106,12 +179,9 @@ const PrintFullReport = ({
           }
         }
 
-        /*
-         * PRINT: Component-level reinforcement of index.css rules.
-         * position:relative keeps the canvas in document flow so all
-         * pages render correctly (position:fixed clips after page 1).
-         */
         @media print {
+          @page { margin: 10mm 12mm; size: A4 portrait; }
+
           html, body, #root,
           #layout-main, #layout-main > div,
           .min-h-screen,
@@ -146,13 +216,6 @@ const PrintFullReport = ({
             box-sizing: border-box !important;
           }
 
-          /*
-           * Per-store blocks — ALLOW natural page breaks.
-           * break-inside:auto lets invoice rows split across A4 pages
-           * for stores with many entries instead of pushing the whole
-           * block to a blank new sheet.
-           * margin-bottom:40px keeps stores visually separated.
-           */
           .store-page-block {
             display: block !important;
             position: relative !important;
@@ -169,7 +232,6 @@ const PrintFullReport = ({
             color: #000000 !important;
           }
 
-          /* Grand total block — keep together, no forced break before */
           .final-summary-block {
             display: block !important;
             position: relative !important;
@@ -187,179 +249,278 @@ const PrintFullReport = ({
             background: #ffffff !important;
             color: #000000 !important;
           }
-
-          .total-footer-row {
-            display: table-row !important;
-          }
         }
       `}} />
 
       {/* ── PRINT CANVAS ─────────────────────────────────────────────────── */}
-      <div className="mans-lanka-master-print">
+      <div className="mans-lanka-master-print" style={{
+        fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+        color: '#000000',
+        fontSize: '10pt',
+        lineHeight: '1.3',
+      }}>
 
-        {reportShops.map((shop) => {
-          const shopTx = activeTransactions.filter(
-            (t) => String(t.shopId) === String(shop.id),
-          );
-          const totalOutstanding = getNetOutstanding(shop);
+        {/* ═══════════════════════════════════════════════════════════════════
+            PHASE 1: Document Header — rendered ONCE at the top of the report
+            ═══════════════════════════════════════════════════════════════════ */}
 
-          return (
-            <div key={shop.id} className="store-page-block">
+        {/* ── 1a. Bold serif "OUTSTANDING REPORT" heading ── */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '14px',
+          paddingBottom: '10px',
+          borderBottom: '2px solid #1a1a2e',
+        }}>
+          <h1 style={{
+            fontFamily: "'Times New Roman', 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif",
+            fontSize: '18pt',
+            fontWeight: 900,
+            margin: 0,
+            letterSpacing: '1px',
+            color: '#1a1a2e',
+            textTransform: 'uppercase',
+          }}>
+            Outstanding Report
+          </h1>
+        </div>
 
-              {/* ── TWO-COLUMN FROM / TO HEADER BOX ────────────────────── */}
-              <div style={{
-                display:        'flex',
-                justifyContent: 'space-between',
-                border:         '1px solid #000000',
-                padding:        '12px',
-                marginBottom:   '15px',
-                background:     '#ffffff',
+        {/* ── 1b. Unified Liyanage Distributors header (once per page) ── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          padding: '10px 14px',
+          marginBottom: '20px',
+          borderBottom: '3px solid #1a1a2e',
+          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          borderRadius: '6px',
+        }}>
+          <div style={{ flexShrink: 0 }}>
+            <img
+              src="/inv_logo.png"
+              alt="Liyanage Distributors"
+              style={{
+                height: '50px',
+                width: 'auto',
+                display: 'block',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h1 style={{
+              fontSize: '16pt',
+              fontWeight: 900,
+              margin: 0,
+              lineHeight: 1.1,
+              letterSpacing: '0.5px',
+              color: '#1a1a2e',
+            }}>
+              {companyName}
+            </h1>
+            <p style={{
+              fontSize: '8pt',
+              margin: '2px 0 0 0',
+              color: '#333',
+              lineHeight: 1.3,
+            }}>
+              {companyAddress} | Tel: {companyTel}
+            </p>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            PHASE 2: Per-shop blocks — shop detail line + transaction table
+            ═══════════════════════════════════════════════════════════════════ */}
+
+        {shopReportData.map(({ shop, statementRows, totalOutstanding }) => (
+          <div key={shop.id} className="store-page-block">
+
+            {/* ── 2a. Creative single-line shop description block ── */}
+            <div style={{
+              padding: '6px 0',
+              marginBottom: '10px',
+              borderBottom: '1px dashed #888',
+              width: '100%',
+              lineHeight: '1.6',
+            }}>
+              <span style={{
+                fontWeight: 800,
+                fontSize: '11pt',
+                color: '#1a1a2e',
               }}>
-                <div style={{ width: '50%' }}>
-                  <strong>From:</strong><br />
-                  Liyanage Distributors,<br />
-                  Hakmana Road, Deiyandara.<br />
-                  Tel: 070-5237647 / 071-5944711
-                </div>
-                <div style={{ width: '50%', borderLeft: '1px solid #000000', paddingLeft: '12px' }}>
-                  <strong>To:</strong><br />
-                  {shop.name}<br />
-                  {shop.address || shop.route || 'Deiyandara'}<br />
-                  Tel: {shop.phone || shop.contact || '—'}
-                </div>
-              </div>
-
-              {/*
-               * ── CONDITIONAL HEADING + SALUTATION ────────────────────────
-               *
-               *  isFullReport = true  → HIDDEN  (bulk internal master report)
-               *  isFullReport = false → VISIBLE (single-store client letter)
-               *
-               * The From/To box immediately precedes the data table on the
-               * full report, saving paper and keeping the layout compact.
-               */}
-              {!isFullReport && (
-                <div style={{ marginBottom: '15px' }}>
-                  <h2 style={{
-                    fontSize:       '14px',
-                    fontWeight:     'bold',
-                    textDecoration: 'underline',
-                    marginBottom:   '8px',
-                    color:          '#000000',
-                  }}>
-                    Outstanding Statement As At: {today}
-                  </h2>
-                  <p style={{
-                    textAlign:  'justify',
-                    lineHeight: '1.6',
-                    fontSize:   '12px',
-                    color:      '#000000',
-                    margin:     '0',
-                  }}>
-                    Dear Sir, Please find below the outstanding balance as at the above-mentioned
-                    date and kindly make arrangements to forward the full payment at your earliest
-                    convenience. All cheques should be drawn in favour of{' '}
-                    <strong>Liyanage Distributors</strong>.
-                  </p>
-                </div>
-              )}
-
-              {/* ── TRANSACTIONS TABLE ─────────────────────────────────── */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left',  borderBottom: '1px solid #000', padding: '4px 6px' }}>Posting Date</th>
-                    <th style={{ textAlign: 'left',  borderBottom: '1px solid #000', padding: '4px 6px' }}>Document No</th>
-                    <th style={{ textAlign: 'left',  borderBottom: '1px solid #000', padding: '4px 6px' }}>Doc Type</th>
-                    <th style={{ textAlign: 'left',  borderBottom: '1px solid #000', padding: '4px 6px' }}>Cheque No</th>
-                    <th style={{ textAlign: 'right', borderBottom: '1px solid #000', padding: '4px 6px' }}>Amount (Rs.)</th>
-                    <th style={{ textAlign: 'right', borderBottom: '1px solid #000', padding: '4px 6px' }}>Balance Due (Rs.)</th>
-                    <th style={{ textAlign: 'right', borderBottom: '1px solid #000', padding: '4px 6px' }}>Age (Days)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shopTx.map((tx) => {
-                    // Invoices carry positive balance; payments show credited amount
-                    const individualBalanceDue =
-                      tx.docType === 'Invoice' ? tx.amount : -tx.amount;
-
-                    const ageDays = tx.date
-                      ? Math.floor((Date.now() - new Date(tx.date).getTime()) / 86400000)
-                      : '—';
-
-                    return (
-                      <tr key={tx.id}>
-                        <td style={{ padding: '4px 6px' }}>{tx.date}</td>
-                        <td style={{ padding: '4px 6px' }}>{tx.docNo}</td>
-                        <td style={{ padding: '4px 6px' }}>{tx.docType}</td>
-                        <td style={{ padding: '4px 6px' }}>{tx.chequeNo || '—'}{tx.bankName ? ` / ${tx.bankName}` : ''}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 6px' }}>
-                          {tx.amount.toLocaleString()}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '4px 6px' }}>
-                          {individualBalanceDue.toLocaleString()}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '4px 6px' }}>{ageDays}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-
-                {/* Total row — aligned under the "Balance Due (Rs.)" column */}
-                <tfoot>
-                  <tr className="total-footer-row" style={{ borderTop: '2px solid #000000' }}>
-                    <td
-                      colSpan={5}
-                      style={{
-                        textAlign:  'right',
-                        fontWeight: 'bold',
-                        fontSize:   '13px',
-                        padding:    '6px 6px 2px 6px',
-                        color:      '#000000',
-                      }}
-                    >
-                      Total Outstanding:
-                    </td>
-                    <td
-                      style={{
-                        textAlign:  'right',
-                        fontWeight: 'bold',
-                        fontSize:   '13px',
-                        padding:    '6px 6px 2px 6px',
-                        color:      '#000000',
-                      }}
-                    >
-                      Rs.&nbsp;{totalOutstanding.toLocaleString()}
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-
-              {/* Signature footer — intentionally removed */}
-
+                {shop.name || '—'}
+              </span>
+              <span style={{
+                fontSize: '9pt',
+                color: '#444',
+                marginLeft: '8px',
+              }}>
+                — {shop.address || '—'}
+              </span>
+              <span style={{
+                fontSize: '9pt',
+                color: '#555',
+                marginLeft: '6px',
+              }}>
+                | {shop.route || shop.address || '—'}
+              </span>
+              <span style={{
+                fontSize: '9pt',
+                color: '#555',
+                marginLeft: '6px',
+              }}>
+                | Tel: {shop.contact || shop.phone || '—'}
+              </span>
             </div>
-          );
-        })}
 
-        {/* ── GRAND TOTAL — rendered after all store blocks ───────────── */}
-        {/* Only visible on the full consolidated report, hidden for single-store print */}
+            {/* ── 2b. Conditional statement heading + salutation (single-store only) ── */}
+            {!isFullReport && (
+              <div style={{ marginBottom: '12px' }}>
+                <h2 style={{
+                  fontSize: '12pt',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  textDecoration: 'underline',
+                  marginBottom: '6px',
+                  color: '#000000',
+                }}>
+                  Outstanding Statement As At: {today}
+                </h2>
+                <p style={{
+                  textAlign: 'justify',
+                  lineHeight: '1.5',
+                  fontSize: '9pt',
+                  color: '#000000',
+                  margin: 0,
+                }}>
+                  Dear Sir, Please find below the outstanding balance as at the above-mentioned
+                  date and kindly make arrangements to forward the full payment at your earliest
+                  convenience. All cheques should be drawn in favour of{' '}
+                  <strong>Liyanage Distributors</strong>.
+                </p>
+              </div>
+            )}
+
+            {/* ── 2c. Transactions Table with Received (Rs.) column and non-cumulative Balance Due ── */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+              <thead>
+                <tr style={{
+                  borderTop: '2px solid #1a1a2e',
+                  borderBottom: '2px solid #1a1a2e',
+                  backgroundColor: '#1a1a2e',
+                  color: '#ffffff',
+                }}>
+                  <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Posting Date</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Document No</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Doc Type</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'left', fontWeight: 600, color: '#ffffff' }}>Cheque No</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Amount (Rs.)</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Received (Rs.)</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Balance Due (Rs.)</th>
+                  <th style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, color: '#ffffff' }}>Age (Days)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statementRows.map((row, idx) => (
+                  <tr key={row.id} style={{
+                    borderBottom: '1px solid #ccc',
+                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f7f7f7',
+                  }}>
+                    <td style={{ padding: '3px 6px' }}>{row.date}</td>
+                    <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace" }}>{row.docNo}</td>
+                    <td style={{ padding: '3px 6px' }}>{row.docType}</td>
+                    <td style={{ padding: '3px 6px', fontFamily: "'Courier New', monospace", fontSize: '8pt' }}>
+                      {row.chequeNo || '—'}{row.bankName ? ` / ${row.bankName}` : ''}
+                    </td>
+                    <td style={{
+                      textAlign: 'right',
+                      padding: '3px 6px',
+                      fontFamily: "'Courier New', monospace",
+                      fontWeight: row.isInvoice ? 600 : 400,
+                    }}>
+                      {row.displayAmount.toLocaleString()}
+                    </td>
+                    <td style={{
+                      textAlign: 'right',
+                      padding: '3px 6px',
+                      fontFamily: "'Courier New', monospace",
+                      fontWeight: !row.isInvoice || row.displayReceived > 0 ? 600 : 400,
+                    }}>
+                      {row.displayReceived > 0 ? row.displayReceived.toLocaleString() : '—'}
+                    </td>
+                    <td style={{
+                      textAlign: 'right',
+                      padding: '3px 6px',
+                      fontFamily: "'Courier New', monospace",
+                      fontWeight: 700,
+                    }}>
+                      {row.displayBalanceDue.toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '3px 6px' }}>{row.ageDays}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{
+                  borderTop: '2px solid #1a1a2e',
+                  borderBottom: '2px solid #1a1a2e',
+                  backgroundColor: '#1a1a2e',
+                  color: '#ffffff',
+                }}>
+                  <td
+                    colSpan={6}
+                    style={{
+                      textAlign: 'right',
+                      fontWeight: 800,
+                      fontSize: '10pt',
+                      padding: '8px 6px',
+                      color: '#ffffff',
+                    }}
+                  >
+                    Total Outstanding:
+                  </td>
+                  <td
+                    style={{
+                      textAlign: 'right',
+                      fontWeight: 800,
+                      fontSize: '10pt',
+                      padding: '8px 6px',
+                      fontFamily: "'Courier New', monospace",
+                      color: '#ffffff',
+                    }}
+                  >
+                    {totalOutstanding.toLocaleString()}
+                  </td>
+                  <td style={{ padding: '8px 6px', color: '#ffffff' }} />
+                </tr>
+              </tfoot>
+            </table>
+
+          </div>
+        ))}
+
+        {/* ── GRAND TOTAL — Final Market Outstanding ─────────────────────── */}
         {isFullReport && (
           <div className="final-summary-block">
             <div style={{
-              display:        'flex',
+              display: 'flex',
               justifyContent: 'flex-end',
-              alignItems:     'center',
-              fontWeight:     'bold',
-              fontSize:       '15px',
-              color:          '#000000',
-              borderTop:      '3px solid #000000',
-              borderBottom:   '3px solid #000000',
-              padding:        '12px 6px',
-              letterSpacing:  '0.02em',
+              alignItems: 'center',
+              fontWeight: 800,
+              fontSize: '13pt',
+              color: '#ffffff',
+              backgroundColor: '#1a1a2e',
+              borderTop: '3px solid #1a1a2e',
+              borderBottom: '3px solid #1a1a2e',
+              padding: '14px 12px',
+              letterSpacing: '0.02em',
             }}>
-              <span>Total Market Outstanding:</span>
-              <span style={{ marginLeft: '16px' }}>Rs.&nbsp;{grandTotal.toLocaleString()}</span>
+              <span>Final Market Outstanding:</span>
+              <span style={{ marginLeft: '16px', fontFamily: "'Courier New', monospace" }}>
+                Rs. {grandTotal.toLocaleString()}
+              </span>
             </div>
           </div>
         )}

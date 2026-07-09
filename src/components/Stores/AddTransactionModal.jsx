@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, FileText, Receipt, CalendarDays, DollarSign, CreditCard, Banknote, Building2, Hash } from 'lucide-react';
+import { X, FileText, Receipt, CalendarDays, DollarSign, CreditCard, Banknote, Building2, Hash, User } from 'lucide-react';
 import SmartCombobox from '../ui/SmartCombobox';
 import FancyDatePicker from '../ui/FancyDatePicker';
+import SalesPersonSearchSelect from '../ui/SalesPersonSearchSelect';
 import useAppStore from '../../hooks/useAppStore';
 
 const PAYMENT_MODES = [
@@ -22,12 +23,12 @@ function emptyForm() {
     date: new Date().toISOString().split('T')[0],
     docType: 'Invoice',
     amount: '',
+    received: '',
     paymentMode: 'cash',
     chequeNo: '',
     bankName: '',
     description: '',
     salesPerson: '',
-    salesPersonPhone: '',
     route: '',
   };
 }
@@ -43,7 +44,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
     if (isOpen) setForm(emptyForm());
   }, [isOpen]);
 
-  const routeOptions = useMemo(() => routes.map((r) => ({ value: r, label: r })), [routes]);
+  const routeOptions = useMemo(() => routes.map((r) => ({ value: r.name, label: r.name })), [routes]);
   const bankOptions  = useMemo(() => bankNames.map((b) => ({ value: b, label: b })), [bankNames]);
 
   /* ─── EARLY RETURN (AFTER all hooks — order is now stable) ─── */
@@ -59,16 +60,17 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) return;
 
+    const received = form.docType === 'Invoice' ? parseFloat(form.received) || 0 : undefined;
     onSave({
       date: form.date,
       docType: form.docType,
       amount,
+      ...(form.docType === 'Invoice' ? { received } : {}),
       paymentMode: form.docType === 'Invoice' ? 'credit' : form.paymentMode,
       chequeNo: needsChequeFields ? form.chequeNo.trim() : '',
       bankName: needsChequeFields ? form.bankName.trim() : '',
       description: form.description.trim(),
       salesPerson: form.docType === 'Invoice' ? form.salesPerson.trim() : '',
-      salesPersonPhone: form.docType === 'Invoice' ? form.salesPersonPhone.trim() : '',
       route: form.docType === 'Invoice' ? form.route : '',
     });
     onClose();
@@ -78,7 +80,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm dark:bg-gray-900/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-gray-900/20 backdrop-blur-sm dark:bg-gray-900/40" />
       <div className="relative w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[90vh] overflow-visible flex flex-col dark:bg-slate-800 dark:border-slate-700">
 
         {/* Header */}
@@ -187,22 +189,32 @@ export default function AddTransactionModal({ isOpen, onClose, onSave, shopName 
             </div>
           )}
 
+          {/* Received Amount — only for Invoice (Amount already handled above) */}
+          {form.docType === 'Invoice' && (
+            <div>
+              <label className="input-label">
+                <Receipt size={13} className="inline mr-1 text-gray-400" /> Already Received (Rs.)
+              </label>
+              <input type="number" placeholder="0.00" min="0" step="0.01"
+                value={form.received} onChange={(e) => setForm((f) => ({ ...f, received: e.target.value }))}
+                className="input-field" />
+              <p className="text-[10px] text-gray-400 mt-0.5">Balance Due = Amount − Received. Default: 0 if nothing collected yet.</p>
+            </div>
+          )}
+
           {/* Invoice extra fields */}
           {form.docType === 'Invoice' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="input-label">Sales Person</label>
-                  <input type="text" placeholder="e.g., Kamal Perera"
-                    value={form.salesPerson} onChange={set('salesPerson')}
-                    className="input-field" />
-                </div>
-                <div>
-                  <label className="input-label">Sales Person Phone</label>
-                  <input type="text" placeholder="077-XXXXXXX"
-                    value={form.salesPersonPhone} onChange={set('salesPersonPhone')}
-                    className="input-field" />
-                </div>
+              {/* Sales Person — Premium Search Select Only */}
+              <div>
+                <label className="input-label">
+                  <User size={13} className="inline mr-1 text-gray-400" /> Sales Person
+                </label>
+                <SalesPersonSearchSelect
+                  value={form.salesPerson}
+                  onSelect={(val) => setForm((f) => ({ ...f, salesPerson: val }))}
+                  placeholder="Search & select a sales person..."
+                />
               </div>
               <div>
                 <label className="input-label">Route</label>

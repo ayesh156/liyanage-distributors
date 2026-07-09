@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import ShopDetail from './ShopDetail';
@@ -8,6 +8,7 @@ import HardwareStoresTable from './HardwareStoresTable';
 import InvoiceHistory from './InvoiceHistory';
 import InvoicePrintView from './InvoicePrintView';
 import PrintFullReport from '../Report/PrintFullReport';
+import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 
 export default function StoresManager({
   shops,
@@ -36,6 +37,9 @@ export default function StoresManager({
   const [editingShop,  setEditingShop]  = useState(null);
   const [viewMode,     setViewMode]     = useState('list'); // 'list' | 'invoiceHistory'
 
+  // Delete confirm state
+  const [deleteTarget, setDeleteTarget] = useState(null); // shop object
+
   // Print state
   const [printInvoice,     setPrintInvoice]     = useState(null);
   const [printOutstanding, setPrintOutstanding] = useState(false);
@@ -54,10 +58,15 @@ export default function StoresManager({
     setShowAddShop(true);
   };
 
-  const handleDeleteShop = (id) => {
+  const handleDeleteShopRequest = (shop) => {
+    setDeleteTarget(shop);
+  };
+
+  const handleDeleteShopConfirm = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
     deleteShop(id);
-    setShowAddShop(false);
-    setEditingShop(null);
+    setDeleteTarget(null);
     // Navigate back if we deleted the currently-selected shop
     if (selectedShopId === id) {
       setSelectedShopId(null);
@@ -94,12 +103,14 @@ export default function StoresManager({
   };
 
   // ── Print ──────────────────────────────────────────────────────────────
-  // NOTE: Never call setTheme() or modify theme state here.
-  // All print styling is handled purely by @media print CSS in index.css.
+  // CRITICAL: printInvoice and printOutstanding are MUTUALLY EXCLUSIVE.
+  // Each handler clears the OTHER state before triggering the print dialog,
+  // preventing the "OUTSTANDING STATEMENT" container from leaking into the
+  // standalone InvoicePrintView layout.
 
   const handlePrintReceipt = (transaction) => {
     setPrintInvoice(transaction);
-    // Allow React to commit the portal content before the browser print dialog opens
+    setPrintOutstanding(false);          // ← GUARD: kill outstanding render
     requestAnimationFrame(() => {
       requestAnimationFrame(() => window.print());
     });
@@ -108,11 +119,23 @@ export default function StoresManager({
   const handlePrintOutstanding = (shopId) => {
     setSelectedShopId(shopId);
     setPrintOutstanding(true);
-    // Allow React to commit the portal content before the browser print dialog opens
+    setPrintInvoice(null);               // ← GUARD: kill invoice render
     requestAnimationFrame(() => {
       requestAnimationFrame(() => window.print());
     });
   };
+
+  // ── After-print cleanup ──────────────────────────────────────────────
+  // Resets both print states once the native print dialog closes so stale
+  // portal content never lingers between print sessions.
+  useEffect(() => {
+    const handler = () => {
+      setPrintInvoice(null);
+      setPrintOutstanding(false);
+    };
+    window.addEventListener('afterprint', handler);
+    return () => window.removeEventListener('afterprint', handler);
+  }, []);
 
   // Print portal content (portaled to body to escape Layout's print:hidden)
   const printContent = (printOutstanding || printInvoice) && (
@@ -172,7 +195,6 @@ export default function StoresManager({
               isOpen={showAddShop}
               onClose={() => { setShowAddShop(false); setEditingShop(null); }}
               onSave={handleSaveShop}
-              onDelete={handleDeleteShop}
               routes={routes}
               editShop={editingShop}
             />
@@ -194,13 +216,12 @@ export default function StoresManager({
               setSearchQuery={setSearchQuery}
               onAddShop={handleAddShop}
               onEditShop={handleEditShop}
-              onDeleteShop={handleDeleteShop}
+              onDeleteShop={handleDeleteShopRequest}
             />
             <AddShopModal
               isOpen={showAddShop}
               onClose={() => { setShowAddShop(false); setEditingShop(null); }}
               onSave={handleSaveShop}
-              onDelete={handleDeleteShop}
               routes={routes}
               editShop={editingShop}
             />
@@ -217,6 +238,20 @@ export default function StoresManager({
           />
         )}
       </div>
+
+      {/* Delete Confirmation Modal for Stores */}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteShopConfirm}
+        entityType="store"
+        entityName={deleteTarget?.name || ''}
+        extraMessage={
+          deleteTarget
+            ? `All transactions and invoice history for this store will also be permanently removed.`
+            : null
+        }
+      />
 
       {/* Print portal */}
       {printContent && createPortal(printContent, document.body)}
